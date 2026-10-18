@@ -13,7 +13,7 @@
   <img alt="Apps of about 0.7 MB" src="https://img.shields.io/badge/apps-~0.7%20MB-44cc11">
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-44cc11">
   <img alt="Built in Zig 0.17" src="https://img.shields.io/badge/built%20in-Zig%200.17-f7a41d?logo=zig&logoColor=white">
-  <img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
+  <img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 <p align="center">
@@ -233,8 +233,9 @@ channels or plugins yet. Bound methods run on the main thread.
 
 ## License
 
-nanoui is licensed under the [Apache License 2.0](LICENSE). [NOTICE](NOTICE)
-carries the attributions to mygo (MIT) and GPUI (Apache 2.0).
+nanoui is licensed under the [MIT License](LICENSE). Material from mygo (MIT)
+and GPUI (Apache 2.0) keeps its own notices; see
+[third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Credits
 
@@ -257,4 +258,4 @@ nanoui stands on the shoulders of two projects:
   - Gaussian shadows;
   - its general idea of a fast, GPU-drawn native UI.
 
-<p align="center"><sub>Built in Zig 0.17 · <a href="AGENTS.md">AGENTS.md</a> · <a href="hillclimb/README.md">benchmarks</a> · <a href="LICENSE">Apache-2.0</a></sub></p>
+<p align="center"><sub>Built in Zig 0.17 · <a href="AGENTS.md">AGENTS.md</a> · <a href="hillclimb/README.md">benchmarks</a> · <a href="LICENSE">MIT</a> · <a href="THIRD_PARTY_NOTICES.md">third-party notices</a></sub></p>

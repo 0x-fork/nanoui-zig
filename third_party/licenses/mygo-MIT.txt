@@ -1,14 +1,3 @@
-nanoui
-Copyright 2026 Rach Pradhan
-
-Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-nanoui began as a port of the core of mygo to Zig, and its native UI
-follows designs from GPUI. Their notices follow.
-
-------------------------------------------------------------------------
-mygo — https://github.com/egoist/mygo
-
 MIT License
 
 Copyright (c) 2026 MyGo contributors
@@ -30,9 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-------------------------------------------------------------------------
-GPUI — https://github.com/zed-industries/zed/tree/main/crates/gpui
-
-GPUI is part of Zed, by Zed Industries, Inc., and is licensed under the
-Apache License, Version 2.0.
