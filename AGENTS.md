@@ -14,7 +14,9 @@ machine (`-Dtarget=...`).
 - **Every file is at most 600 lines.** Source, scripts, shaders, docs: no
   exceptions. When a file would grow past 600 lines, split it by
   responsibility (a widget set, a backend concern, a layout pass) before
-  adding to it. `zig build lines` checks it and must pass.
+  adding to it. `zig build lines` checks it and must pass. The one
+  exception: upstream license texts kept verbatim in `third_party/licenses/`,
+  which must not be split or edited.
 - **Zig 0.17.0.** Use its APIs (`std.process.Init`, `std.Io`, `@Fn`,
   `std.lang.Type`'s `field_names`/`field_types`/`decl_names`), not older idioms.
 - **No C shims.** Native code is called directly: the Objective-C runtime
