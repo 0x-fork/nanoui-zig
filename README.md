@@ -1,10 +1,12 @@
 <p align="center">
-  <img src="docs/images/nanomon-window.png" alt="nanomon, built on nanoui: the overview in Codegraff Light, with cell graphs of CPU, memory, GPU, disk and network" width="760">
+  <img src="docs/images/nano-transparent.png" alt="Nano, nanoui's field mouse craftsperson, wearing a blue workshop jacket and holding a miniature app window" width="280">
 </p>
 
 <h1 align="center">nanoui</h1>
 
 <p align="center">Desktop apps in Zig, with native UI drawn on the GPU or a web frontend.</p>
+
+<p align="center"><sub>Meet Nano. <a href="docs/images/nano-transparent.png">Transparent PNG</a> · <a href="docs/images/nano-paper.png">Original paper illustration</a></sub></p>
 
 <p align="center">Want to see it in use? <a href="https://github.com/justrach/nanoterm"><strong>nanoterm</strong></a> is a terminal with a coding agent, and <a href="https://github.com/justrach/nanomon"><strong>nanomon</strong></a> an activity monitor, both built on nanoui.</p>
 
@@ -25,6 +27,10 @@
   <a href="#apps">Apps</a> ·
   <a href="#performance">Performance</a> ·
   <a href="#credits">Credits</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/nanomon-window.png" alt="nanomon, built on nanoui: the overview in Codegraff Light, with cell graphs of CPU, memory, GPU, disk and network" width="760">
 </p>
 
 Each window shows one of two kinds of interface:
