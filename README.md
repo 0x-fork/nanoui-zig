@@ -199,6 +199,10 @@ renderer on a Mac. Linux is also tested in a container
   </tr>
 </table>
 
+Download them for macOS:
+[nanoterm](https://github.com/justrach/nanoterm/releases/latest/download/nanoterm-macos-arm64.dmg) ·
+[nanomon](https://github.com/justrach/nanomon/releases/latest/download/nanomon-macos-arm64.dmg).
+
 Both live in `apps/` as submodules, and each also builds on its own, fetching
 nanoui pinned by commit. To build one against the nanoui next to it, with
 your changes, use `--fork`: `cd apps/nanomon && zig build run --fork=../..`.
