@@ -117,6 +117,7 @@ zig build run-counter     # native UI
 zig build run-gallery     # native UI widgets
 zig build gen             # write examples/hello/frontend/nanoui.{js,d.ts}
 cd hillclimb && zig build run -- --label "change"   # climb: compare with mygo and history
+cd apps/nanomon && zig build test --fork=../..     # an app (a submodule) against this nanoui, not its pinned one
 
 # Headless checks of the real apps (no window is shown):
 zig-out/bin/gallery --nanoui-snapshot=/tmp/g.png --nanoui-script="click:Tasks;type:Hi;key:enter"
