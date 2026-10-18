@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/gallery-dark.png" alt="The nanoui gallery: buttons, toggles, sliders and a text field, drawn by nanoui" width="720">
+  <img src="docs/images/nanomon-window.png" alt="nanomon, built on nanoui: the overview in Codegraff Light, with cell graphs of CPU, memory, GPU, disk and network" width="760">
 </p>
 
 <h1 align="center">nanoui</h1>
@@ -78,6 +78,11 @@ pub fn main(init: std.process.Init) !void {
     try app.run();
 }
 ```
+
+<p align="center">
+  <img src="docs/images/gallery-dark.png" alt="The nanoui gallery: buttons, toggles, sliders and a text field, drawn by nanoui" width="640">
+  <br><sub>The gallery example, <code>zig build run-gallery</code>.</sub>
+</p>
 
 Views are immediate mode: a function of your state, run on every event.
 Widgets answer from the previous frame's layout. When an interaction changes
