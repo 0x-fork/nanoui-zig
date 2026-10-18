@@ -89,6 +89,27 @@ fn roundedBox(px: f32, py: f32, hw: f32, hh: f32, r: f32) [2]f32 {
     return .{ d, grad };
 }
 
+/// How much of the pixel at `wx`, `wy` the instance's clip lets through:
+/// all of it, but in the clip's rounded corners (as the shader's
+/// `clip_cover`).
+inline fn clipCover(i: *const gpu.Instance, wx: f32, wy: f32, inv: f32) f32 {
+    if (i.clip_round <= 0) return 1;
+    const round = gpu.clipCorners(i.clip_round);
+    const c = i.clip;
+    const hw = (c[2] - c[0]) * 0.5;
+    const hh = (c[3] - c[1]) * 0.5;
+    const r = @min(round.radius, @min(hw, hh));
+    // Between the corners, nothing is cut.
+    if ((wx > c[0] + r and wx < c[2] - r) or (wy > c[1] + r and wy < c[3] - r)) return 1;
+    const qx = wx - c[0] - hw;
+    const qy = wy - c[1] - hh;
+    const bit: u4 = if (qy < 0) (if (qx < 0) 1 else 2) else (if (qx < 0) 8 else 4);
+    if (round.corners & bit == 0) return 1;
+    const sd = roundedBox(qx, qy, hw, hh, r);
+    const aa = @max(sd[1] * inv, 0.0001) * 0.5;
+    return 1 - smoothstep(-aa, aa, sd[0]);
+}
+
 fn quad(out: gpu.Pixels, i: *const gpu.Instance, scale: f32, b: [4]usize) void {
     const hw = i.rect[2] * 0.5;
     const hh = i.rect[3] * 0.5;
@@ -110,8 +131,9 @@ fn quad(out: gpu.Pixels, i: *const gpu.Instance, scale: f32, b: [4]usize) void {
         for (b[0]..b[2]) |x| {
             const wx = (@as(f32, @floatFromInt(x)) + 0.5) * inv;
             const pxl = wx - cx;
+            const cut = clipCover(i, wx, wy, inv);
             if (inner_y and @abs(pxl) < hw - solid) {
-                const a = c[3];
+                const a = c[3] * cut;
                 blend(out.bytes, row + x * 4, c[0] * a, c[1] * a, c[2] * a, a);
                 continue;
             }
@@ -124,7 +146,7 @@ fn quad(out: gpu.Pixels, i: *const gpu.Instance, scale: f32, b: [4]usize) void {
                 const t = smoothstep(-bw - aa, -bw + aa, sd[0]);
                 for (0..4) |k| col[k] = c[k] + (bc[k] - c[k]) * t;
             }
-            const a = col[3] * coverage;
+            const a = col[3] * coverage * cut;
             blend(out.bytes, row + x * 4, col[0] * a, col[1] * a, col[2] * a, a);
         }
     }
@@ -167,7 +189,7 @@ fn glyph(out: gpu.Pixels, i: *const gpu.Instance, mask: Mask, scale: f32, b: [4]
             const wx = (@as(f32, @floatFromInt(x)) + 0.5) * inv;
             const tx = (wx - i.rect[0]) / i.rect[2];
             const u = i.uv[0] + (i.uv[2] - i.uv[0]) * tx;
-            const a = sample(mask, u, v) * c[3];
+            const a = sample(mask, u, v) * c[3] * clipCover(i, wx, wy, inv);
             blend(out.bytes, row + x * 4, c[0] * a, c[1] * a, c[2] * a, a);
         }
     }
@@ -210,7 +232,7 @@ fn picture(out: gpu.Pixels, i: *const gpu.Instance, p: Pictures, scale: f32, b: 
             const tx = (wx - i.rect[0]) / i.rect[2];
             const sd = roundedBox(wx - i.rect[0] - hw, wy - i.rect[1] - hh, hw, hh, r);
             const aa = @max(sd[1] * inv, 0.0001) * 0.5;
-            const k = (1 - smoothstep(-aa, aa, sd[0])) * i.color[3];
+            const k = (1 - smoothstep(-aa, aa, sd[0])) * i.color[3] * clipCover(i, wx, wy, inv);
             if (k <= 0) continue;
             const t = samplePicture(p, i.uv[0] + (i.uv[2] - i.uv[0]) * tx, v);
             blend(out.bytes, row + x * 4, t[2] * k, t[1] * k, t[0] * k, t[3] * k);
@@ -266,11 +288,13 @@ fn shadow(out: gpu.Pixels, i: *const gpu.Instance, scale: f32, b: [4]usize) void
     const c = i.color;
     const inv = 1 / scale;
     for (b[1]..b[3]) |y| {
-        const py = (@as(f32, @floatFromInt(y)) + 0.5) * inv - cy;
+        const wy = (@as(f32, @floatFromInt(y)) + 0.5) * inv;
+        const py = wy - cy;
         const row = y * out.width * 4;
         for (b[0]..b[2]) |x| {
-            const pxl = (@as(f32, @floatFromInt(x)) + 0.5) * inv - cx;
-            const a = shadowAlpha(pxl, py, hw, hh, r, sigma) * c[3];
+            const wx = (@as(f32, @floatFromInt(x)) + 0.5) * inv;
+            const pxl = wx - cx;
+            const a = shadowAlpha(pxl, py, hw, hh, r, sigma) * c[3] * clipCover(i, wx, wy, inv);
             blend(out.bytes, row + x * 4, c[0] * a, c[1] * a, c[2] * a, a);
         }
     }
@@ -297,4 +321,28 @@ test "rounded boxes, borders, glyphs and shadows" {
     // The glyph is blue where its clip lets it be.
     try std.testing.expectEqual([4]u8{ 255, 0, 0, 255 }, at(out, 2, 2));
     try std.testing.expectEqual([4]u8{ 255, 255, 255, 255 }, at(out, 15, 2));
+}
+
+test "a clip's rounded corners cut what it clips, only where asked" {
+    const gpa = std.testing.allocator;
+    const bytes = try gpa.alloc(u8, 40 * 40 * 4);
+    defer gpa.free(bytes);
+    const out: gpu.Pixels = .{ .bytes = bytes, .width = 40, .height = 40 };
+    // A square filling its clip, whose left corners round by 8.
+    draw(out, &.{
+        .{ .rect = .{ 0, 0, 20, 20 }, .color = .{ 1, 0, 0, 1 }, .clip = .{ 0, 0, 20, 20 }, .clip_round = gpu.clipRound(8, 1 | 8) },
+    }, .{ .pixels = &.{}, .size = 0 }, .{}, 2, .{ .r = 1, .g = 1, .b = 1 });
+    const at = struct {
+        fn f(o: gpu.Pixels, x: usize, y: usize) [4]u8 {
+            return o.bytes[(y * o.width + x) * 4 ..][0..4].*;
+        }
+    }.f;
+    try std.testing.expectEqual([4]u8{ 255, 255, 255, 255 }, at(out, 0, 0));
+    try std.testing.expectEqual([4]u8{ 255, 255, 255, 255 }, at(out, 0, 39));
+    try std.testing.expectEqual([4]u8{ 0, 0, 255, 255 }, at(out, 39, 0));
+    try std.testing.expectEqual([4]u8{ 0, 0, 255, 255 }, at(out, 39, 39));
+    try std.testing.expectEqual([4]u8{ 0, 0, 255, 255 }, at(out, 20, 20));
+    const unpacked = gpu.clipCorners(gpu.clipRound(8, 1 | 8));
+    try std.testing.expectEqual(@as(f32, 8), unpacked.radius);
+    try std.testing.expectEqual(@as(u4, 9), unpacked.corners);
 }

@@ -15,8 +15,24 @@ pub const Instance = extern struct {
     radius: f32 = 0,
     border_width: f32 = 0,
     kind: f32 = 0,
-    pad: f32 = 0,
+    /// The clip's rounded corners (`clipRound`): 0 for a plain rectangle.
+    clip_round: f32 = 0,
 };
+
+/// The clip rectangle's corners rounded by `radius`: those in `corners`
+/// (1 top left, 2 top right, 4 bottom right, 8 bottom left), packed in one
+/// float as the shader reads it.
+pub fn clipRound(radius: f32, corners: u4) f32 {
+    if (corners == 0 or radius <= 0) return 0;
+    return @as(f32, @floatFromInt(corners)) * 4096 + @min(radius, 4095);
+}
+
+/// `clipRound` unpacked: the radius and the corners.
+pub fn clipCorners(v: f32) struct { radius: f32, corners: u4 } {
+    if (v <= 0) return .{ .radius = 0, .corners = 0 };
+    const m = @floor(v / 4096);
+    return .{ .radius = v - m * 4096, .corners = @intFromFloat(m) };
+}
 
 pub const Kind = struct {
     pub const quad: f32 = 0;

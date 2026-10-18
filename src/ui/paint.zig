@@ -85,8 +85,10 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
         child_clip = visible;
         c.addHit(n.id, index, visible, true);
     }
+    const first = out.items.len;
     var child = n.first_child;
     while (child != none) : (child = c.node(child).next) paintNode(c, out, child, child_clip, opacity, selectable);
+    if ((st.clip or st.scroll) and st.radius > 0) roundClip(out.items[first..], r, visible, st.radius);
 
     if (st.scroll) paintScrollbar(c, out, n, visible, opacity);
 }
@@ -195,6 +197,42 @@ fn decorations(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Cont
             .color = metal.color4(color.alpha(opacity)),
             .clip = clip4,
         });
+    }
+}
+
+/// What a box with rounded corners clips is cut by its corners too: each
+/// instance it clipped whose clip shares one of the box's corners (one the
+/// box's own clip didn't cut off) has that corner rounded. A clip within
+/// keeps its own rounding.
+fn roundClip(items: []metal.Instance, box: types.Rect, visible: types.Rect, radius: f32) void {
+    const near = struct {
+        fn f(a: f32, b: f32) bool {
+            return @abs(a - b) < 0.01;
+        }
+    }.f;
+    const v = metal.clip4(visible);
+    const b = metal.clip4(box);
+    // The box's corners left whole by its own clip: 1 top left, 2 top
+    // right, 4 bottom right, 8 bottom left.
+    var whole: u4 = 0;
+    if (near(v[0], b[0]) and near(v[1], b[1])) whole |= 1;
+    if (near(v[2], b[2]) and near(v[1], b[1])) whole |= 2;
+    if (near(v[2], b[2]) and near(v[3], b[3])) whole |= 4;
+    if (near(v[0], b[0]) and near(v[3], b[3])) whole |= 8;
+    if (whole == 0) return;
+    for (items) |*i| {
+        const k = i.clip;
+        var corners: u4 = 0;
+        if (near(k[0], v[0]) and near(k[1], v[1])) corners |= 1;
+        if (near(k[2], v[2]) and near(k[1], v[1])) corners |= 2;
+        if (near(k[2], v[2]) and near(k[3], v[3])) corners |= 4;
+        if (near(k[0], v[0]) and near(k[3], v[3])) corners |= 8;
+        corners &= whole;
+        if (corners == 0) continue;
+        const had = metal.clipCorners(i.clip_round);
+        if (had.corners == 0) {
+            i.clip_round = metal.clipRound(radius, corners);
+        } else if (near(had.radius, radius)) i.clip_round = metal.clipRound(radius, had.corners | corners);
     }
 }
 

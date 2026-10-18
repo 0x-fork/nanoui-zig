@@ -2,7 +2,8 @@
 // borders (kind 0), glyph runs and icons sampled from the atlas (kind 1),
 // shadows (kind 2): Gaussian blurs of rounded boxes, as GPUI draws them, or
 // pictures sampled from the image atlas (kind 3), their corners rounded.
-// Each is clipped to its clip rectangle.
+// Each is clipped to its clip rectangle, some of whose corners may be
+// rounded (a box with rounded corners that clips its children).
 #include <metal_stdlib>
 using namespace metal;
 
@@ -15,7 +16,7 @@ struct Instance {
     float radius;
     float border_width;  // blur radius for shadows
     float kind;
-    float pad;
+    float clip_round;    // corners * 4096 + radius (gpu.zig's clipRound)
 };
 
 struct VOut {
@@ -84,6 +85,8 @@ static float rounded_box(float2 p, float2 half_size, float r) {
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
+static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float> images);
+
 fragment float4 fs(VOut in [[stage_in]],
                    constant Instance *instances [[buffer(0)]],
                    texture2d<float> atlas [[texture(0)]],
@@ -91,7 +94,23 @@ fragment float4 fs(VOut in [[stage_in]],
     Instance i = instances[in.inst];
     if (in.world.x < i.clip.x || in.world.y < i.clip.y || in.world.x > i.clip.z || in.world.y > i.clip.w)
         discard_fragment();
+    float clip_cover = 1.0;
+    if (i.clip_round > 0.0) {
+        float corners = floor(i.clip_round / 4096.0);
+        float rad = i.clip_round - corners * 4096.0;
+        float2 ch = (i.clip.zw - i.clip.xy) * 0.5;
+        float2 q = in.world - i.clip.xy - ch;
+        // Derivatives outside the branch on the corner: it differs by pixel.
+        float cd = rounded_box(q, ch, min(rad, min(ch.x, ch.y)));
+        float caa = max(fwidth(cd), 0.0001) * 0.5;
+        uint bit = q.y < 0.0 ? (q.x < 0.0 ? 1u : 2u) : (q.x < 0.0 ? 8u : 4u);
+        if ((uint(corners) & bit) != 0u) clip_cover = 1.0 - smoothstep(-caa, caa, cd);
+        if (clip_cover <= 0.0) discard_fragment();
+    }
+    return shade(in, i, atlas, images) * clip_cover;
+}
 
+static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float> images) {
     if (i.kind == 1.0) {
         constexpr sampler s(filter::linear, address::clamp_to_edge);
         float a = atlas.sample(s, in.uv).r * i.color.a;

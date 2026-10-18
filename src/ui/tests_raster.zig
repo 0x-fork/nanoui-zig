@@ -1,6 +1,6 @@
 //! The CPU renderer against the Metal renderer: one frame of widgets
-//! (text, icons, borders, rounded corners, shadows, clipping, a picture) drawn by
-//! both must come out the same, to rounding.
+//! (text, icons, borders, rounded corners, shadows, clipping, rounded
+//! clips, a picture) drawn by both must come out the same, to rounding.
 const std = @import("std");
 const testing = std.testing;
 const ui = @import("ui.zig");
@@ -20,6 +20,17 @@ const Scene = struct {
             ui.text(c, "Wrapped text in a card with a shadow, long enough to break onto a second line.", .{ .size = 13, .wrap = true });
             _ = ui.toggle(c, "Notifications", &s.on);
             _ = ui.slider(c, &s.value, .{});
+        }
+        {
+            // A rounded box clipping its children, one a clip of its own
+            // that shares the box's right corners.
+            const box = ui.div(c).row().w(150).h(36).rounded(12).clip();
+            defer box.end();
+            const left = ui.div(c).w(90).hFull().bg(.hex(0xd04a2f));
+            left.end();
+            const right = ui.div(c).grow().hFull().clip().bg(.hex(0x2f6fd0));
+            defer right.end();
+            ui.text(c, "clipped", .{ .size = 12, .color = .{ .r = 1, .g = 1, .b = 1 } });
         }
         ui.row(c, .{ .gap = 8 });
         defer ui.end(c);
@@ -77,6 +88,29 @@ fn compare() !void {
     try testing.expect(worst <= 16);
     // Edges may round differently; no more than one channel in a thousand.
     try testing.expect(off * 1000 < metal.bytes.len);
+}
+
+test "a box with rounded corners clips its children at them, nested clips too" {
+    const gpa = testing.allocator;
+    var s: Scene = .{};
+    var t: ui.Tester = undefined;
+    try t.init(gpa, .init(&s, Scene.view), .{ .width = 360, .height = 300 });
+    defer t.deinit();
+    t.settle(1);
+    const gpu = @import("gpu.zig");
+    var boxes: u4 = 0;
+    var inner: u4 = 0;
+    for (t.instances.items) |i| {
+        const round = gpu.clipCorners(i.clip_round);
+        if (round.corners == 0) continue;
+        try testing.expectEqual(@as(f32, 12), round.radius);
+        // The red and blue boxes are clipped by the rounded box: all four
+        // corners. The white text in the blue box by the blue box's own
+        // clip: rounded only where it shares the rounded box's corners.
+        if (i.color[0] > 0.9 and i.color[1] > 0.9 and i.color[2] > 0.9) inner |= round.corners else boxes |= round.corners;
+    }
+    try testing.expectEqual(@as(u4, 15), boxes);
+    try testing.expectEqual(@as(u4, 2 | 4), inner);
 }
 
 test "nanoui's PNG decoder reads what ImageIO writes (compressed), pixel for pixel" {
