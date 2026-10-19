@@ -67,6 +67,7 @@ src/menu.zig          menus from templates: roles, accelerators, checkboxes
 src/tray.zig          status bar icons
 src/dialog.zig        open/save panels, message boxes
 src/desktop.zig       clipboard, shell (open, reveal, trash), paths, appearance
+src/update.zig        updates from GitHub releases: check, verify, swap the bundle
 src/ui/ui.zig         native UI's public API and View
 src/ui/context.zig    per-frame box tree, ids, input, hit testing, animation
 src/ui/input.zig      keys, shortcuts, text operations, one event's input

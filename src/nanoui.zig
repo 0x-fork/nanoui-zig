@@ -73,6 +73,10 @@ pub const Directory = plat.desktop.Directory;
 pub const path = plat.desktop.path;
 pub const isDark = plat.desktop.isDark;
 pub const accentColor = plat.desktop.accentColor;
+/// Updates from GitHub's releases for a signed app bundle (macOS).
+pub const update = @import("update.zig");
+pub const Updater = update.Updater;
+pub const UpdateOptions = update.Options;
 /// Runs the event loop for a while (headless tests: replies, processes, timers).
 pub const runFor = @import("platform.zig").runFor;
 
@@ -82,6 +86,7 @@ test {
     _ = tsgen;
     _ = ui;
     _ = @import("menu_types.zig");
+    _ = @import("update.zig");
     if (!mac) {
         inline for (.{ plat.app, plat.window, plat.menu, plat.dialog, plat.desktop, plat.fdwatch, }) |m| std.testing.refAllDecls(m);
         return;
