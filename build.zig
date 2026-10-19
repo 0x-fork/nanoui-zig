@@ -21,6 +21,14 @@ pub fn build(b: *std.Build) void {
     nanoui.addOptions("build_options", options);
     const os = target.result.os.tag;
     if (os == .macos) {
+        // A target other than this Mac's (an older macOS for a release,
+        // `-Dtarget=aarch64-macos.13.0`) gets no SDK from Zig: use Xcode's.
+        if (!target.query.isNative()) {
+            if (std.zig.system.darwin.getSdk(b.allocator, b.graph.io, &target.result)) |sdk| {
+                nanoui.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System/Library/Frameworks" }) });
+                nanoui.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr/lib" }) });
+            }
+        }
         for (frameworks) |f| nanoui.linkFramework(f, .{});
         nanoui.linkSystemLibrary("objc", .{});
     }
