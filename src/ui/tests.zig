@@ -403,6 +403,8 @@ test "a picture keeps its proportions, fits its room, and bad bytes draw nothing
             defer ui.end(c);
             p.ok = ui.image(c, .{ .key = "wide", .bytes = p.bytes, .max_width = 100 });
             p.bad = ui.image(c, .{ .key = "junk", .bytes = "not a picture" });
+            // Made at a pixel a point (a picture from the web): twice as large.
+            _ = ui.image(c, .{ .key = "web", .bytes = p.bytes, .max_width = 1000, .scale = 1 });
         }
     };
     var px: [400 * 100 * 4]u8 = @splat(255);
@@ -415,11 +417,17 @@ test "a picture keeps its proportions, fits its room, and bad bytes draw nothing
     t.settle(1);
     try testing.expect(p.ok);
     try testing.expect(!p.bad);
-    // 400×100 pixels is 200×50 points at 2×; fitted to 100 wide.
+    // 400×100 pixels is 200×50 points at 2×; fitted to 100 wide. At 1×
+    // it is 400×100 points.
+    var sizes: [2][2]f32 = undefined;
+    var k: usize = 0;
     for (t.ctx.nodes.items) |n| if (n.content == .image) {
-        try testing.expectEqual(@as(f32, 100), n.rect.w);
-        try testing.expectEqual(@as(f32, 25), n.rect.h);
+        sizes[k] = .{ n.rect.w, n.rect.h };
+        k += 1;
     };
+    try testing.expectEqual(@as(usize, 2), k);
+    try testing.expectEqual([2]f32{ 100, 25 }, sizes[0]);
+    try testing.expectEqual([2]f32{ 400, 100 }, sizes[1]);
 }
 
 test "a box that follows its end stays where the reader left it when content shrinks and grows" {

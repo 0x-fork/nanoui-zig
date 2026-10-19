@@ -112,11 +112,14 @@ pub const ImageOptions = struct {
     /// the caller while it is shown.
     bytes: []const u8,
     /// The most room it takes, in points; it keeps its proportions and is
-    /// never drawn larger than its pixels at 2×.
+    /// never drawn larger than its pixels at `scale`.
     max_width: f32 = 480,
     max_height: f32 = 360,
     radius: f32 = 8,
     opacity: f32 = 1,
+    /// Pixels a point the picture was made at: 2 for a Retina screenshot,
+    /// 1 for most pictures on the web (a badge).
+    scale: f32 = 2,
 };
 
 /// A picture; false (and nothing drawn) if it can't be decoded.
@@ -124,8 +127,8 @@ pub fn image(c: *Context, opts: ImageOptions) bool {
     const k = @import("images.zig").Images.key(opts.key);
     // Sized from the decoded picture; packed only when it is drawn.
     const e = c.text.images.info(k, opts.bytes) orelse return false;
-    const w: f32 = @as(f32, @floatFromInt(e.width)) / 2;
-    const h: f32 = @as(f32, @floatFromInt(e.height)) / 2;
+    const w: f32 = @as(f32, @floatFromInt(e.width)) / @max(opts.scale, 0.5);
+    const h: f32 = @as(f32, @floatFromInt(e.height)) / @max(opts.scale, 0.5);
     const s = @min(1, @min(opts.max_width / @max(w, 1), opts.max_height / @max(h, 1)));
     _ = c.leaf(.{ .width = .{ .px = @round(w * s) }, .height = .{ .px = @round(h * s) }, .radius = opts.radius }, .{ .image = .{ .key = k, .bytes = opts.bytes, .opacity = opts.opacity } }, null);
     return true;
