@@ -10,6 +10,7 @@ const shader_source = @embedFile("shader.metal") ++ @embedFile("glass.metal");
 
 const gpu = @import("gpu.zig");
 const metal_glass = @import("metal_glass.zig");
+const metal_texture = @import("metal_texture.zig");
 pub const Instance = gpu.Instance;
 pub const Kind = gpu.Kind;
 pub const color4 = gpu.color4;
@@ -32,6 +33,11 @@ pub const Renderer = struct {
     capacities: [frames_in_flight]usize = @splat(0),
     next_buffer: usize = 0,
     in_flight: objc.dispatch_semaphore_t,
+    /// The frame's textures (`ui.texture`), set by whoever draws it.
+    textures: []const gpu.Texture = &.{},
+    frame_textures: metal_texture.Textures = .{ .gpa = std.heap.page_allocator },
+    /// Pixel buffers each frame in flight holds, by its instance buffer.
+    held: [frames_in_flight]std.ArrayList(*anyopaque) = @splat(.empty),
 
     pub fn init() !Renderer {
         const pool = objc.Pool.push();
@@ -111,6 +117,11 @@ pub const Renderer = struct {
         // Wait for the frames in flight: their handlers signal this renderer.
         for (0..frames_in_flight) |_| _ = objc.dispatch_semaphore_wait(self.in_flight, objc.DISPATCH_TIME_FOREVER);
         for (0..frames_in_flight) |_| _ = objc.dispatch_semaphore_signal(self.in_flight);
+        for (&self.held) |*h| {
+            self.frame_textures.release(h);
+            h.deinit(self.frame_textures.gpa);
+        }
+        self.frame_textures.deinit();
         objc.dispatch_release(self.in_flight);
         for (self.buffers) |b| if (b) |buf| objc.release(buf);
         objc.release(self.layer);
@@ -138,8 +149,11 @@ pub const Renderer = struct {
             return;
         };
         const texture = objc.msg(objc.Object, drawable, "texture", .{});
+        // The slot's last frame is done: its pixel buffers can go.
+        const held = &self.held[self.next_buffer];
+        self.frame_textures.release(held);
         const buffer = self.upload(instances);
-        const cmd = self.encode(texture, buffer, instances, atlas, size, clear);
+        const cmd = self.encode(texture, buffer, instances, atlas, size, clear, held);
         var done = objc.Block(Renderer, &.{objc.Object}).init(self, frameDone);
         objc.msg(void, cmd, "addCompletedHandler:", .{@as(*anyopaque, @ptrCast(&done))});
         if (self.live_resize) {
@@ -209,11 +223,14 @@ pub const Renderer = struct {
         _ = objc.dispatch_semaphore_wait(self.in_flight, objc.DISPATCH_TIME_FOREVER);
         defer _ = objc.dispatch_semaphore_signal(self.in_flight);
         const t0 = cf.CACurrentMediaTime();
+        const held = &self.held[self.next_buffer];
+        self.frame_textures.release(held);
         const buffer = self.upload(instances);
-        const cmd = self.encode(target, buffer, instances, atlas, size, clear);
+        const cmd = self.encode(target, buffer, instances, atlas, size, clear, held);
         objc.msg(void, cmd, "commit", .{});
         const t1 = cf.CACurrentMediaTime();
         objc.msg(void, cmd, "waitUntilCompleted", .{});
+        self.frame_textures.release(held);
         const gpu_s = objc.msg(f64, cmd, "GPUEndTime", .{}) - objc.msg(f64, cmd, "GPUStartTime", .{});
         return .{ .encode_ms = (t1 - t0) * 1000, .gpu_ms = gpu_s * 1000 };
     }
@@ -237,9 +254,12 @@ pub const Renderer = struct {
             @as(*const anyopaque, src.ptr), @as(objc.NSUInteger, src.len), @as(objc.NSUInteger, 0),
         });
         defer if (buffer) |b| objc.release(b);
-        const cmd = self.encode(texture, buffer, instances, atlas, size, clear);
+        var held: std.ArrayList(*anyopaque) = .empty;
+        defer held.deinit(self.frame_textures.gpa);
+        const cmd = self.encode(texture, buffer, instances, atlas, size, clear, &held);
         objc.msg(void, cmd, "commit", .{});
         objc.msg(void, cmd, "waitUntilCompleted", .{});
+        self.frame_textures.release(&held);
         const bytes = try gpa.alloc(u8, w * h * 4);
         const Region = extern struct { x: usize, y: usize, z: usize, w: usize, h: usize, d: usize };
         objc.msg(void, texture, "getBytes:bytesPerRow:fromRegion:mipmapLevel:", .{
@@ -277,7 +297,25 @@ pub const Renderer = struct {
         });
     }
 
-    fn encode(self: *Renderer, texture: objc.Object, instance_buffer: ?objc.Object, instances: []const Instance, atlas: objc.Object, size: types.Size, clear: types.Color) objc.Object {
+    /// Draws instances [first, end) with the main pipeline, a texture's
+    /// quad (`ui.texture`) alone, its texture bound.
+    fn drawRun(self: *Renderer, enc: objc.Object, buffer: objc.Object, atlas: objc.Object, size: types.Size, instances: []const Instance, first: usize, end: usize, held: *std.ArrayList(*anyopaque)) void {
+        var from = first;
+        var i = first;
+        while (i < end) : (i += 1) {
+            if (instances[i].kind != Kind.texture) continue;
+            if (i > from) self.drawRange(enc, self.pipeline, buffer, atlas, size, from, i - from);
+            from = i + 1;
+            const slot: usize = @intFromFloat(instances[i].border_width);
+            if (slot >= self.textures.len) continue;
+            const tex = self.frame_textures.get(self.device, self.textures[slot], slot, held) orelse continue;
+            objc.msg(void, enc, "setFragmentTexture:atIndex:", .{ tex, @as(objc.NSUInteger, 3) });
+            self.drawRange(enc, self.pipeline, buffer, atlas, size, i, 1);
+        }
+        if (end > from) self.drawRange(enc, self.pipeline, buffer, atlas, size, from, end - from);
+    }
+
+    fn encode(self: *Renderer, texture: objc.Object, instance_buffer: ?objc.Object, instances: []const Instance, atlas: objc.Object, size: types.Size, clear: types.Color, held: *std.ArrayList(*anyopaque)) objc.Object {
         const cmd = objc.msg(objc.Object, self.queue, "commandBuffer", .{});
         const buffer = instance_buffer orelse {
             objc.msg(void, pass(cmd, texture, clear), "endEncoding", .{});
@@ -292,7 +330,7 @@ pub const Renderer = struct {
             const end = pane_at orelse instances.len;
             const enc = pass(cmd, texture, if (cleared) null else clear);
             cleared = true;
-            if (end > first) self.drawRange(enc, self.pipeline, buffer, atlas, size, first, end - first);
+            if (end > first) self.drawRun(enc, buffer, atlas, size, instances, first, end, held);
             objc.msg(void, enc, "endEncoding", .{});
             const at = pane_at orelse break;
             first = at + 1;

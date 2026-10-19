@@ -18,6 +18,8 @@ pub const Mask = struct {
 pub const Pictures = struct {
     pixels: []const u8 = &.{},
     size: u32 = 0,
+    /// The frame's textures (`ui.texture`): their `bgra` is drawn.
+    textures: []const gpu.Texture = &.{},
 };
 
 /// Draws `instances` over `clear` into `out` (sized `out.width` ×
@@ -56,7 +58,12 @@ fn bounds(out: gpu.Pixels, i: *const gpu.Instance, scale: f32) ?[4]usize {
 fn drawOne(out: gpu.Pixels, i: *const gpu.Instance, mask: Mask, pictures: Pictures, scale: f32) void {
     const b = bounds(out, i, scale) orelse return;
     if (i.kind == gpu.Kind.text) return glyph(out, i, mask, scale, b);
-    if (i.kind == gpu.Kind.image) return picture(out, i, pictures, scale, b);
+    if (i.kind == gpu.Kind.image) return picture(out, i, .atlas(pictures), scale, b);
+    if (i.kind == gpu.Kind.texture) {
+        const slot: usize = @intFromFloat(i.border_width);
+        if (slot < pictures.textures.len) picture(out, i, .texture(pictures.textures[slot]), scale, b);
+        return;
+    }
     if (i.kind == gpu.Kind.shadow) return shadow(out, i, scale, b);
     if (i.kind == gpu.Kind.glass) return pane(out, i, scale, b);
     quad(out, i, scale, b);
@@ -198,28 +205,44 @@ fn glyph(out: gpu.Pixels, i: *const gpu.Instance, mask: Mask, scale: f32, b: [4]
 }
 
 /// A BGRA texel of the image atlas, bilinear as Metal's sampler.
-fn samplePicture(p: Pictures, u: f32, v: f32) [4]f32 {
-    const s: f32 = @floatFromInt(p.size);
-    const fx = u * s - 0.5;
-    const fy = v * s - 0.5;
+/// Pixels to sample: the image atlas, or a texture's rows.
+const Source = struct {
+    pixels: []const u8,
+    w: usize,
+    h: usize,
+    stride: usize,
+
+    fn atlas(p: Pictures) Source {
+        return .{ .pixels = p.pixels, .w = p.size, .h = p.size, .stride = @as(usize, p.size) * 4 };
+    }
+
+    fn texture(t: gpu.Texture) Source {
+        return .{ .pixels = t.bgra, .w = t.width, .h = t.height, .stride = if (t.stride > 0) t.stride else @as(usize, t.width) * 4 };
+    }
+};
+
+fn samplePicture(p: Source, u: f32, v: f32) [4]f32 {
+    const fx = u * @as(f32, @floatFromInt(p.w)) - 0.5;
+    const fy = v * @as(f32, @floatFromInt(p.h)) - 0.5;
     const x0f = @floor(fx);
     const y0f = @floor(fy);
     const tx = fx - x0f;
     const ty = fy - y0f;
-    const max: i64 = @as(i64, p.size) - 1;
-    const xs = [2]usize{ @intCast(std.math.clamp(@as(i64, @intFromFloat(x0f)), 0, max)), @intCast(std.math.clamp(@as(i64, @intFromFloat(x0f)) + 1, 0, max)) };
-    const ys = [2]usize{ @intCast(std.math.clamp(@as(i64, @intFromFloat(y0f)), 0, max)), @intCast(std.math.clamp(@as(i64, @intFromFloat(y0f)) + 1, 0, max)) };
+    const mx: i64 = @as(i64, @intCast(p.w)) - 1;
+    const my: i64 = @as(i64, @intCast(p.h)) - 1;
+    const xs = [2]usize{ @intCast(std.math.clamp(@as(i64, @intFromFloat(x0f)), 0, mx)), @intCast(std.math.clamp(@as(i64, @intFromFloat(x0f)) + 1, 0, mx)) };
+    const ys = [2]usize{ @intCast(std.math.clamp(@as(i64, @intFromFloat(y0f)), 0, my)), @intCast(std.math.clamp(@as(i64, @intFromFloat(y0f)) + 1, 0, my)) };
     var out: [4]f32 = .{ 0, 0, 0, 0 };
     const weights = [4]f32{ (1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty };
     for (0..4) |k| {
-        const t = p.pixels[(ys[k / 2] * p.size + xs[k % 2]) * 4 ..][0..4];
+        const t = p.pixels[ys[k / 2] * p.stride + xs[k % 2] * 4 ..][0..4];
         for (0..4) |ch| out[ch] += @as(f32, @floatFromInt(t[ch])) / 255 * weights[k];
     }
     return out;
 }
 
-fn picture(out: gpu.Pixels, i: *const gpu.Instance, p: Pictures, scale: f32, b: [4]usize) void {
-    if (p.size == 0) return;
+fn picture(out: gpu.Pixels, i: *const gpu.Instance, p: Source, scale: f32, b: [4]usize) void {
+    if (p.w == 0 or p.h == 0 or p.pixels.len < p.stride * p.h) return;
     const inv = 1 / scale;
     const hw = i.rect[2] * 0.5;
     const hh = i.rect[3] * 0.5;

@@ -80,6 +80,15 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
                 .kind = metal.Kind.image,
                 .clip = clip4,
             }),
+            .texture => |tx| push(c, out, .{
+                .rect = rect4,
+                .color = .{ 1, 1, 1, tx.opacity * opacity },
+                .uv = tx.uv,
+                .radius = st.radius,
+                .kind = metal.Kind.texture,
+                .border_width = @floatFromInt(tx.slot),
+                .clip = clip4,
+            }),
             .none => {},
         }
     }

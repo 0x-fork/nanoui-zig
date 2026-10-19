@@ -159,7 +159,9 @@ pub const Surface = struct {
             self.pixel_w = w;
             self.pixel_h = h;
         }
-        raster.draw(.{ .bytes = self.pixels, .width = w, .height = h }, self.instances.items, self.text.atlas.mask(), self.text.images.pictures(), self.scale, self.ctx.theme.background);
+        var pictures = self.text.images.pictures();
+        pictures.textures = self.ctx.textures.items;
+        raster.draw(.{ .bytes = self.pixels, .width = w, .height = h }, self.instances.items, self.text.atlas.mask(), pictures, self.scale, self.ctx.theme.background);
         self.stale = false;
     }
 

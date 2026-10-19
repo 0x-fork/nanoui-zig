@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const examples = [_][]const u8{ "hello", "counter", "gallery" };
-const frameworks = [_][]const u8{ "AppKit", "WebKit", "Metal", "QuartzCore", "CoreText", "CoreGraphics", "CoreFoundation", "Foundation", "ImageIO", "UniformTypeIdentifiers" };
+const frameworks = [_][]const u8{ "AppKit", "WebKit", "Metal", "QuartzCore", "CoreText", "CoreGraphics", "CoreFoundation", "Foundation", "ImageIO", "UniformTypeIdentifiers", "CoreVideo" };
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});

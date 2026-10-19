@@ -45,6 +45,24 @@ pub const Kind = struct {
     /// `border_color` its tone (low, high, curve, saturation), and
     /// `border_width` the blur of what shows through, all in points.
     pub const glass: f32 = 4;
+    /// A texture the app gave this frame (`ui.texture`, a video frame):
+    /// `uv` the part of it shown, `border_width` its slot in the frame's
+    /// textures, its corners rounded as a picture's.
+    pub const texture: f32 = 5;
+};
+
+/// Pixels the app gives a frame to show (`ui.texture`), changing as often
+/// as it likes: a video's frames. On macOS a CVPixelBuffer (BGRA, Metal
+/// compatible) is wrapped as a texture without a copy; else, or for the
+/// CPU renderer, `bgra` (premultiplied, `stride` bytes a row, 0 for
+/// `width * 4`) is drawn.
+pub const Texture = struct {
+    width: u32,
+    height: u32,
+    bgra: []const u8 = &.{},
+    stride: usize = 0,
+    /// A CVPixelBufferRef, kept alive by the app until the frame is drawn.
+    pixel_buffer: ?*anyopaque = null,
 };
 
 pub fn color4(c: types.Color) [4]f32 {

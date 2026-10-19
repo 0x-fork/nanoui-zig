@@ -1,7 +1,8 @@
 // nanoui's one shader: instanced quads that are rounded rectangles with
 // borders (kind 0), glyph runs and icons sampled from the atlas (kind 1),
 // shadows (kind 2): Gaussian blurs of rounded boxes, as GPUI draws them, or
-// pictures sampled from the image atlas (kind 3), their corners rounded.
+// pictures sampled from the image atlas (kind 3), their corners rounded,
+// and textures the app gave the frame (kind 5, a video frame), likewise.
 // Panes of glass (kind 4) have their own fragment function (glass.metal).
 // Each is clipped to its clip rectangle, some of whose corners may be
 // rounded (a box with rounded corners that clips its children).
@@ -86,7 +87,7 @@ static float rounded_box(float2 p, float2 half_size, float r) {
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
-static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float> images);
+static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float> images, texture2d<float> frame);
 
 // How much of the fragment the instance's clip lets through: discarded
 // outside it, cut in its rounded corners.
@@ -112,13 +113,14 @@ static float clip_coverage(VOut in, Instance i) {
 fragment float4 fs(VOut in [[stage_in]],
                    constant Instance *instances [[buffer(0)]],
                    texture2d<float> atlas [[texture(0)]],
-                   texture2d<float> images [[texture(1)]]) {
+                   texture2d<float> images [[texture(1)]],
+                   texture2d<float> frame [[texture(3)]]) {
     Instance i = instances[in.inst];
     float clip_cover = clip_coverage(in, i);
-    return shade(in, i, atlas, images) * clip_cover;
+    return shade(in, i, atlas, images, frame) * clip_cover;
 }
 
-static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float> images) {
+static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float> images, texture2d<float> frame) {
     if (i.kind == 1.0) {
         constexpr sampler s(filter::linear, address::clamp_to_edge);
         float a = atlas.sample(s, in.uv).r * i.color.a;
@@ -142,6 +144,13 @@ static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float
             return float4(i.border_color.rgb * a, a);
         }
         return px * (coverage * i.color.a);
+    }
+
+    if (i.kind == 5.0) {
+        constexpr sampler s(filter::linear, address::clamp_to_edge);
+        float aa = max(fwidth(d), 0.0001) * 0.5;
+        float coverage = 1.0 - smoothstep(-aa, aa, d);
+        return frame.sample(s, in.uv) * (coverage * i.color.a);
     }
 
     if (i.kind == 2.0) {

@@ -57,6 +57,8 @@ pub const scroll = widgets.scroll;
 pub const spacer = widgets.spacer;
 pub const divider = widgets.divider;
 pub const image = widgets.image;
+pub const texture = widgets.texture;
+pub const Texture = @import("gpu.zig").Texture;
 pub const ImageOptions = widgets.ImageOptions;
 pub const text = widgets.text;
 pub const textf = widgets.textf;
@@ -114,6 +116,7 @@ test {
     _ = @import("tests.zig");
     _ = @import("tests_keymap.zig");
     _ = @import("tests_multiline.zig");
+    _ = @import("tests_texture.zig");
     _ = @import("keymap.zig");
     _ = @import("undo.zig");
     _ = @import("tests_cursor.zig");

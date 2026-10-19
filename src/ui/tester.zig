@@ -193,7 +193,7 @@ pub const Tester = struct {
     pub fn findText(t: *Tester, s: []const u8) ?types.Rect {
         for (t.ctx.nodes.items) |n| switch (n.content) {
             .text => |tx| if (std.mem.eql(u8, tx.str, s)) return n.rect,
-            .icon, .image, .none => {},
+            .icon, .image, .texture, .none => {},
         };
         return null;
     }
@@ -206,7 +206,7 @@ pub const Tester = struct {
     pub fn containsText(t: *Tester, s: []const u8) bool {
         for (t.ctx.nodes.items) |n| switch (n.content) {
             .text => |tx| if (std.mem.indexOf(u8, tx.str, s) != null) return true,
-            .icon, .image, .none => {},
+            .icon, .image, .texture, .none => {},
         };
         return false;
     }
@@ -229,11 +229,14 @@ pub const Tester = struct {
     /// The last frame's pixels (BGRA, premultiplied); free with `deinit`.
     pub fn render(t: *Tester, gpa: std.mem.Allocator) !gpu.Pixels {
         if (!portable) t.renderer.syncImages(&t.text.images);
+        if (!portable) t.renderer.textures = t.ctx.textures.items;
         if (!portable) return t.renderer.drawOffscreen(gpa, t.instances.items, t.text.texture(), t.size, t.scale, t.theme.background);
         const w: usize = @intFromFloat(@max(1, @round(t.size.w * t.scale)));
         const h: usize = @intFromFloat(@max(1, @round(t.size.h * t.scale)));
         const out: gpu.Pixels = .{ .bytes = try gpa.alloc(u8, w * h * 4), .width = w, .height = h };
-        raster.draw(out, t.instances.items, t.text.atlas.mask(), t.text.images.pictures(), t.scale, t.theme.background);
+        var pictures = t.text.images.pictures();
+        pictures.textures = t.ctx.textures.items;
+        raster.draw(out, t.instances.items, t.text.atlas.mask(), pictures, t.scale, t.theme.background);
         return out;
     }
 

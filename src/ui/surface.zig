@@ -179,6 +179,7 @@ pub const Surface = struct {
         self.last_frame_time = now;
         const r = frame_mod.run(c, self.view, &self.text, &self.instances, self.size, self.scale, self.theme(), dt, now - self.start_time);
         self.renderer.syncImages(&self.text.images);
+        self.renderer.textures = c.textures.items;
         self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);
         self.updateCursor();
         // Something moved under a still pointer, or a value is animating.

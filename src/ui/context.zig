@@ -17,6 +17,15 @@ pub const Content = union(enum) {
     text: Text,
     icon: Icon,
     image: Image,
+    texture: Texture,
+
+    /// One of this frame's textures (`Context.textures`), the part `uv`
+    /// (0 to 1) of it shown.
+    pub const Texture = struct {
+        slot: u32,
+        uv: [4]f32 = .{ 0, 0, 1, 1 },
+        opacity: f32 = 1,
+    };
 
     /// A picture: its key in the image atlas, and its bytes for the first
     /// time it is drawn.
@@ -127,6 +136,8 @@ pub const Context = struct {
     next_hits: std.ArrayList(Hit) = .empty,
     anims: std.AutoHashMapUnmanaged(u64, Anim) = .empty,
     scroll: std.AutoHashMapUnmanaged(u64, f32) = .empty,
+    /// The textures this frame shows (`ui.texture`), by slot.
+    textures: std.ArrayList(@import("gpu.zig").Texture) = .empty,
     edits: std.AutoHashMapUnmanaged(u64, EditState) = .empty,
     /// The largest scroll offset of each scrolling box in the last layout,
     /// for boxes that follow their end.
@@ -189,6 +200,7 @@ pub const Context = struct {
 
     pub fn deinit(c: *Context) void {
         c.arena.deinit();
+        c.textures.deinit(c.gpa);
         c.nodes.deinit(c.gpa);
         c.stack.deinit(c.gpa);
         c.rects.deinit(c.gpa);
@@ -223,6 +235,7 @@ pub const Context = struct {
     /// Starts building a frame: the root fills the window.
     pub fn begin(c: *Context) void {
         _ = c.arena.reset(.retain_capacity);
+        c.textures.clearRetainingCapacity();
         c.nodes.clearRetainingCapacity();
         c.stack.clearRetainingCapacity();
         c.next_hits.clearRetainingCapacity();
