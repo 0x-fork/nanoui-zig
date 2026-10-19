@@ -3,6 +3,7 @@
 //! key bindings, selection with the keyboard and the mouse, the clipboard,
 //! and horizontal scrolling that keeps the caret in view.
 const std = @import("std");
+const keymap = @import("keymap.zig");
 const types = @import("types.zig");
 const utf8 = @import("utf8.zig");
 const ctx_mod = @import("context.zig");
@@ -99,6 +100,8 @@ pub const Options = struct {
     /// No box of its own (border, fill, focus ring): for a field inside a
     /// larger frame, as a chat composer.
     bare: bool = false,
+    /// The editing keys: the system's, Emacs's or Vim's (keymap.zig).
+    keys: keymap.Keymap = .system,
 };
 
 pub const Result = struct {
@@ -110,10 +113,14 @@ pub const Result = struct {
     accepted: bool = false,
     /// The caret's byte offset after this frame's edits.
     caret: usize = 0,
+    /// Vim's normal mode is on (for a mode indicator).
+    vim_normal: bool = false,
+    /// Vim's j and k in normal mode: -1 back through history, 1 forward.
+    history: i8 = 0,
 };
 
 /// Applies one text input operation to the buffer and its editing state.
-fn apply(buffer: *TextBuffer, e: *EditState, op: ctx_mod.TextOp, opts: Options, clip: ctx_mod.Clipboard, result: *Result) void {
+pub fn apply(buffer: *TextBuffer, e: *EditState, op: ctx_mod.TextOp, opts: Options, clip: ctx_mod.Clipboard, result: *Result) void {
     const password = opts.password;
     const s = buffer.text();
     // → or End at the end of the text takes the suggestion.
@@ -167,6 +174,16 @@ fn apply(buffer: *TextBuffer, e: *EditState, op: ctx_mod.TextOp, opts: Options, 
                         };
                         buffer.remove(from, e.caret);
                         collapse(e, from);
+                    } else return;
+                    result.changed = true;
+                },
+                .delete_word_forward, .delete_to_line_end => {
+                    if (hi > lo) {
+                        buffer.remove(lo, hi);
+                        collapse(e, lo);
+                    } else if (e.caret < s.len) {
+                        const to = if (cmd == .delete_word_forward) nextWord(s, e.caret) else s.len;
+                        buffer.remove(e.caret, to);
                     } else return;
                     result.changed = true;
                 },
@@ -290,15 +307,18 @@ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
             }
             if (!c.input.down) e.selecting = false;
         }
+        // Emacs's and Vim's keys first; what they take isn't typed.
+        const took: keymap.Took = if (opts.keys != .system) keymap.handle(c, buffer, e, opts, &result) else .{};
         for (c.input.ops) |op| {
+            if (took.text and op == .insert) continue;
             if (op == .command and op.command == .cancel) c.focus = 0;
             // Copy with a selection here is the field's; else the page's.
             if (op == .command and (op.command == .copy or op.command == .cut) and e.caret != e.anchor) c.copy_done = true;
             apply(buffer, e, op, opts, c.clipboard, &result);
         }
         // Without an input method (tests, synthetic input): keys and chars.
-        if (c.input.chars.len > 0) apply(buffer, e, .{ .insert = c.input.chars }, opts, c.clipboard, &result);
-        if (c.input.key) |k| switch (k) {
+        if (c.input.chars.len > 0 and !took.text) apply(buffer, e, .{ .insert = c.input.chars }, opts, c.clipboard, &result);
+        if (!took.key) if (c.input.key) |k| switch (k) {
             .backspace => apply(buffer, e, .{ .command = .delete_backward }, opts, c.clipboard, &result),
             .delete => apply(buffer, e, .{ .command = .delete_forward }, opts, c.clipboard, &result),
             .left => apply(buffer, e, .{ .command = if (c.input.shift) .select_left else .move_left }, opts, c.clipboard, &result),
@@ -323,6 +343,7 @@ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
     const focused = it.focused and c.focus == it.id;
     result.focused = focused;
     result.caret = e.caret;
+    result.vim_normal = opts.keys == .vim and e.vim_normal;
     const s = buffer.text();
     const shown = shownOf(s, opts.password, bullets);
     const lh = c.text.font(style).lineHeight();
@@ -355,7 +376,10 @@ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
         _ = c.leaf(.{ .absolute = true, .width = .{ .px = x1 - x0 }, .height = .{ .px = 1.5 }, .background = th.text, .offset = .{ .x = x0 - e.scroll_x, .y = lh - 1 } }, .none, null);
     };
     if (focused and hi == lo) {
-        _ = c.leaf(.{ .absolute = true, .width = .{ .px = 1.5 }, .height = .{ .px = lh }, .background = th.accent, .offset = .{ .x = caret_x - e.scroll_x } }, .none, null);
+        // Vim's normal mode: a block over the character under the caret.
+        const block = result.vim_normal;
+        const w: f32 = if (!block) 1.5 else if (e.caret < s.len) @max(4, c.text.caretX(shown, style, shownIndex(s, opts.password, @min(s.len, e.caret + 1))) - caret_x) else c.text.width("m", style);
+        _ = c.leaf(.{ .absolute = true, .width = .{ .px = w }, .height = .{ .px = lh }, .background = if (block) th.accent.alpha(0.45) else th.accent, .offset = .{ .x = caret_x - e.scroll_x } }, .none, null);
     }
     if (focused) {
         const r = it.rect orelse types.Rect{};

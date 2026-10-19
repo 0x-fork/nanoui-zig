@@ -50,6 +50,8 @@ pub const Command = enum {
     delete_forward,
     delete_word_backward,
     delete_to_line_start,
+    delete_word_forward,
+    delete_to_line_end,
     move_left,
     move_right,
     move_word_left,
@@ -100,6 +102,13 @@ pub const EditState = struct {
     scroll_x: f32 = 0,
     /// Pressed in the field: dragging extends the selection.
     selecting: bool = false,
+    /// Emacs and Vim keys (keymap.zig): what was last killed (^K, ^U,
+    /// ^W, dd), for ^Y and p; Vim's normal mode and an operator waiting
+    /// for its motion (d, c).
+    killed: [256]u8 = undefined,
+    killed_len: usize = 0,
+    vim_normal: bool = false,
+    vim_pending: u8 = 0,
 };
 
 pub const Input = struct {

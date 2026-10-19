@@ -21,6 +21,8 @@ pub const Context = ctx_mod.Context;
 pub const Interaction = ctx_mod.Interaction;
 pub const FrameStats = ctx_mod.FrameStats;
 pub const Shortcut = ctx_mod.Shortcut;
+/// A text field's editing keys: the system's, Emacs's or Vim's.
+pub const Keymap = @import("keymap.zig").Keymap;
 /// The system's editing commands (Option-Delete, Command-Left…), as `TextOp`s.
 pub const Command = @import("input.zig").Command;
 pub const TextOp = @import("input.zig").TextOp;
@@ -77,6 +79,7 @@ pub const kbd = widgets.kbd;
 pub const textField = textfield.textField;
 pub const TextFieldOptions = textfield.Options;
 pub const TextBuffer = textfield.TextBuffer;
+pub const TextFieldResult = textfield.Result;
 pub const div = @import("div.zig").div;
 pub const Div = @import("div.zig").Div;
 pub const list = @import("list.zig").list;
@@ -109,6 +112,7 @@ test {
     _ = @import("layout.zig");
     _ = textfield;
     _ = @import("tests.zig");
+    _ = @import("tests_keymap.zig");
     _ = @import("tests_cursor.zig");
     // CoreText's fast path, on macOS.
     if (!@import("text.zig").portable) _ = @import("shaper.zig");

@@ -384,7 +384,8 @@ fn keyDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void 
         const ctrl = flags & (1 << 18) != 0;
         const alt = flags & (1 << 19) != 0;
         const special = key == 0xF700 or key == 0xF701 or key == '\t' or key == 0x1b;
-        if (in.cmd or ctrl or special) {
+        // Option too: a text field with Emacs's keys takes ⌥B, ⌥F, ⌥D.
+        if (in.cmd or ctrl or alt or special) {
             s.ctx.shortcut_taken = false;
             in.shortcut = .{ .key = key, .cmd = in.cmd, .ctrl = ctrl, .alt = alt, .shift = in.shift };
             s.frame();
