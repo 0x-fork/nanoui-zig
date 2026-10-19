@@ -65,7 +65,14 @@ pub const Command = enum {
     select_line_start,
     select_line_end,
     select_all,
+    /// A line up or down: a multiline field's; a single line's start or end.
+    move_up,
+    move_down,
+    select_up,
+    select_down,
     insert_newline,
+    /// Option-Return, Shift-Return: a new line in a multiline field.
+    insert_line_break,
     insert_tab,
     cancel,
     copy,
@@ -100,6 +107,8 @@ pub const EditState = struct {
     anchor: usize = 0,
     marked: ?[2]usize = null,
     scroll_x: f32 = 0,
+    /// A multiline field's lines scrolled up past its top.
+    scroll_y: f32 = 0,
     /// Pressed in the field: dragging extends the selection.
     selecting: bool = false,
     /// Emacs's and Vim's keys (keymap.zig) and the undo history.

@@ -113,6 +113,7 @@ test {
     _ = textfield;
     _ = @import("tests.zig");
     _ = @import("tests_keymap.zig");
+    _ = @import("tests_multiline.zig");
     _ = @import("keymap.zig");
     _ = @import("undo.zig");
     _ = @import("tests_cursor.zig");
