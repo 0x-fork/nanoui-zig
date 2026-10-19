@@ -173,6 +173,37 @@ test "wrapped text fits the room a row gives it" {
     try testing.expect(r.h > 40); // more than two lines
 }
 
+const Bullets = struct {
+    const long = "The first item, which wraps only beside its marker.";
+    fn view(_: *Bullets, c: *ui.Context) void {
+        // Room for the first item's text on one line, but not beside the
+        // marker: the row measured at its whole width thought one line.
+        const col = ui.div(c).column().w(c.text.width(long, .{}) + 10 + 20).gap(6).p(10);
+        defer col.end();
+        for ([_][]const u8{ long, "The second item." }) |line| {
+            // A list's item: a marker of fixed width, the text beside it.
+            const item = ui.div(c).row().wFull().gap(8);
+            defer item.end();
+            _ = c.leaf(.{ .width = .{ .px = 16 }, .height = .{ .px = 16 } }, .none, null);
+            const box = ui.div(c).column().grow();
+            defer box.end();
+            ui.text(c, line, .{ .wrap = true });
+        }
+    }
+};
+
+test "a row is as tall as its text wrapped beside a fixed box" {
+    var s: Bullets = .{};
+    var t: ui.Tester = undefined;
+    try t.init(testing.allocator, .init(&s, Bullets.view), .{ .width = 400, .height = 300 });
+    defer t.deinit();
+    const first = t.findText(Bullets.long).?;
+    const second = t.findText("The second item.").?;
+    // It wraps in the room beside the marker, and the next item comes after.
+    try testing.expect(first.h > 30);
+    try testing.expect(second.y >= first.y + first.h + 6 - 0.5);
+}
+
 const Field = struct {
     buf: ui.TextBuffer = .{},
     fn view(s: *Field, c: *ui.Context) void {

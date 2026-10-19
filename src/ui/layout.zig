@@ -80,6 +80,7 @@ pub fn measure(c: *Context, index: u32, avail_w: f32) types.Size {
             if (count > 1) {
                 if (st.direction == .row) content.w += st.gap * (count - 1) else content.h += st.gap * (count - 1);
             }
+            if (st.direction == .row and flexible) content.h = fitRow(c, n.first_child, st.gap, inner_w);
         },
     }
 
@@ -227,6 +228,44 @@ pub fn arrange(c: *Context, index: u32, rect_in: types.Rect) void {
         arrange(c, child, r);
         pos += m + spacing;
     }
+}
+
+/// A row's height once its wrapping text has the widths `arrange` will
+/// give it: measured at the row's whole width, text beside a fixed box (a
+/// list's marker) fits on fewer lines than it gets, and the row would be
+/// too short for it. The same shares of free room as `arrange`'s.
+fn fitRow(c: *Context, first: u32, gap: f32, inner_w: f32) f32 {
+    var used: f32 = 0;
+    var grow_total: f32 = 0;
+    var shrink_total: f32 = 0;
+    var count: f32 = 0;
+    var child = first;
+    while (child != none) : (child = c.node(child).next) {
+        const ch = c.node(child);
+        if (ch.style.absolute) continue;
+        used += if (ch.style.width == .fill) 0 else ch.measured.w;
+        grow_total += growOf(.row, ch.style);
+        if (ch.flexible) shrink_total += ch.measured.w;
+        count += 1;
+    }
+    used += gap * @max(0, count - 1);
+    const free = inner_w - used;
+    var h: f32 = 0;
+    child = first;
+    while (child != none) : (child = c.node(child).next) {
+        const ch = c.node(child);
+        if (ch.style.absolute) continue;
+        var ch_h = ch.measured.h;
+        if (ch.flexible and ch.style.width != .px) {
+            var m = if (ch.style.width == .fill) 0 else ch.measured.w;
+            if (free > 0 and grow_total > 0) m += free * growOf(.row, ch.style) / grow_total;
+            if (free < 0 and shrink_total > 0) m = @max(ch.style.min_width, m + free * m / shrink_total);
+            m = @min(m, ch.style.max_width);
+            if (@abs(m - ch.measured.w) > 0.5) ch_h = measure(c, child, m).h;
+        }
+        h = @max(h, ch_h);
+    }
+    return h;
 }
 
 fn growOf(dir: types.Direction, st: types.Style) f32 {
