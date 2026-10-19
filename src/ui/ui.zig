@@ -21,6 +21,9 @@ pub const Context = ctx_mod.Context;
 pub const Interaction = ctx_mod.Interaction;
 pub const FrameStats = ctx_mod.FrameStats;
 pub const Shortcut = ctx_mod.Shortcut;
+/// The system's editing commands (Option-Delete, Command-Left…), as `TextOp`s.
+pub const Command = @import("input.zig").Command;
+pub const TextOp = @import("input.zig").TextOp;
 pub const Cursor = ctx_mod.Cursor;
 pub const Theme = @import("theme.zig").Theme;
 /// Key combinations as the platform writes them: `ui.keys.label("⌘P")`.

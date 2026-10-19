@@ -120,6 +120,8 @@ pub const Input = struct {
     shift: bool = false,
     cmd: bool = false,
     ctrl: bool = false,
+    /// Option on the Mac, Alt elsewhere: held with this event's key.
+    alt: bool = false,
 
     /// The key that adds to a selection with a click: Command on the
     /// Mac, Control elsewhere.

@@ -260,6 +260,7 @@ pub const Surface = struct {
         self.ctx.input.shift = flags & (1 << 17) != 0;
         self.ctx.input.cmd = flags & (1 << 20) != 0;
         self.ctx.input.ctrl = flags & (1 << 18) != 0;
+        self.ctx.input.alt = flags & (1 << 19) != 0;
     }
 };
 
@@ -373,6 +374,8 @@ fn keyDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void 
     const in = &s.ctx.input;
     in.cmd = flags & (1 << 20) != 0;
     in.shift = flags & (1 << 17) != 0;
+    in.ctrl = flags & (1 << 18) != 0;
+    in.alt = flags & (1 << 19) != 0;
     // Key combinations go to the view first, which may take them.
     const ign = objc.fromNSString(objc.msg(?objc.Object, event, "charactersIgnoringModifiers", .{}));
     if (ign.len > 0) {

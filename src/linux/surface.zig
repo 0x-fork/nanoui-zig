@@ -363,6 +363,8 @@ fn onKey(_: *gtk.Widget, e: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int {
     in.cmd = false;
     const ctrl = state & gtk.control_mask != 0;
     const alt = state & gtk.alt_mask != 0;
+    in.ctrl = ctrl;
+    in.alt = alt;
     const key = keyOf(keyval);
     // Key combinations go to the menus' accelerators, then the view.
     const special: ?u21 = if (key) |k| switch (k) {
