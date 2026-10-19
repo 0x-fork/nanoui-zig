@@ -3,6 +3,7 @@
 const std = @import("std");
 const types = @import("types.zig");
 const metal = @import("gpu.zig");
+const glass = @import("glass.zig");
 const text_mod = @import("text.zig");
 const rich = text_mod.rich;
 const ctx_mod = @import("context.zig");
@@ -43,9 +44,12 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
             .kind = metal.Kind.shadow,
             .clip = clip4,
         });
-        if (st.background != null or st.border != null) push(c, out, .{
+        // Glass takes the background's place.
+        const fill: ?types.Color = if (st.glass != null) null else st.background;
+        if (st.glass) |g| push(c, out, glass.instance(glass.material(g, r.w, r.h, c.theme.dark, c.scale), rect4, st.radius, clip4, opacity));
+        if (fill != null or st.border != null) push(c, out, .{
             .rect = rect4,
-            .color = metal.color4((st.background orelse types.Color.transparent).alpha(opacity)),
+            .color = metal.color4((fill orelse types.Color.transparent).alpha(opacity)),
             .border_color = metal.color4((st.border orelse types.Color.transparent).alpha(opacity)),
             .border_width = if (st.border != null) st.border_width else 0,
             .radius = st.radius,

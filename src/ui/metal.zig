@@ -1,13 +1,15 @@
 //! The Metal renderer: one pipeline, one instanced draw per frame, into a
-//! CAMetalLayer the native view hosts.
+//! CAMetalLayer the native view hosts. Panes of glass split the frame:
+//! each reads what was drawn before it (`metal_glass.zig`).
 const std = @import("std");
 const objc = @import("../objc.zig");
 const cf = @import("cf.zig");
 const types = @import("types.zig");
 
-const shader_source = @embedFile("shader.metal");
+const shader_source = @embedFile("shader.metal") ++ @embedFile("glass.metal");
 
 const gpu = @import("gpu.zig");
+const metal_glass = @import("metal_glass.zig");
 pub const Instance = gpu.Instance;
 pub const Kind = gpu.Kind;
 pub const color4 = gpu.color4;
@@ -21,6 +23,7 @@ pub const Renderer = struct {
     device: objc.Object,
     queue: objc.Object,
     pipeline: objc.Object,
+    glass: metal_glass.Glass,
     layer: objc.Object,
     live_resize: bool = false,
     /// Instances go into one of three buffers, reused once the GPU is done
@@ -47,31 +50,15 @@ pub const Renderer = struct {
             return error.ShaderCompile;
         };
         defer objc.release(library);
-        const vs = objc.msg(objc.Object, library, "newFunctionWithName:", .{objc.nsString("vs")});
-        defer objc.release(vs);
-        const fs = objc.msg(objc.Object, library, "newFunctionWithName:", .{objc.nsString("fs")});
-        defer objc.release(fs);
-
-        const desc = objc.new("MTLRenderPipelineDescriptor");
-        defer objc.release(desc);
-        objc.msg(void, desc, "setVertexFunction:", .{vs});
-        objc.msg(void, desc, "setFragmentFunction:", .{fs});
-        const attachments = objc.msg(objc.Object, desc, "colorAttachments", .{});
-        const ca = objc.msg(objc.Object, attachments, "objectAtIndexedSubscript:", .{@as(objc.NSUInteger, 0)});
-        objc.msg(void, ca, "setPixelFormat:", .{pixel_format});
-        objc.msg(void, ca, "setBlendingEnabled:", .{objc.YES});
-        // Premultiplied alpha: one, one minus source alpha.
-        objc.msg(void, ca, "setSourceRGBBlendFactor:", .{@as(objc.NSUInteger, 1)});
-        objc.msg(void, ca, "setSourceAlphaBlendFactor:", .{@as(objc.NSUInteger, 1)});
-        objc.msg(void, ca, "setDestinationRGBBlendFactor:", .{@as(objc.NSUInteger, 5)});
-        objc.msg(void, ca, "setDestinationAlphaBlendFactor:", .{@as(objc.NSUInteger, 5)});
-        const pipeline = objc.msg(?objc.Object, device, "newRenderPipelineStateWithDescriptor:error:", .{ desc, &err }) orelse
-            return error.PipelineCreate;
+        const pipeline = try makePipeline(device, library, "fs");
+        errdefer objc.release(pipeline);
+        const glass = try metal_glass.Glass.init(device, library, try makePipeline(device, library, "fs_glass"));
 
         const layer = objc.new("CAMetalLayer");
         objc.msg(void, layer, "setDevice:", .{device});
         objc.msg(void, layer, "setPixelFormat:", .{pixel_format});
-        objc.msg(void, layer, "setFramebufferOnly:", .{objc.YES});
+        // Readable: panes of glass read what the frame drew under them.
+        objc.msg(void, layer, "setFramebufferOnly:", .{objc.NO});
         // Two drawables: a frame takes the GPU well under a millisecond, and
         // frames are drawn on demand, so a third would only hold memory
         // (a window-sized buffer, 13 MB for a large window).
@@ -82,7 +69,7 @@ pub const Renderer = struct {
             defer cf.CGColorSpaceRelease(srgb);
             objc.msg(void, layer, "setColorspace:", .{srgb});
         }
-        return .{ .device = device, .queue = queue, .pipeline = pipeline, .layer = layer, .in_flight = objc.dispatch_semaphore_create(frames_in_flight) };
+        return .{ .device = device, .queue = queue, .pipeline = pipeline, .glass = glass, .layer = layer, .in_flight = objc.dispatch_semaphore_create(frames_in_flight) };
     }
 
     /// Brings the GPU's copy of the image atlas up to date (made on the
@@ -127,6 +114,7 @@ pub const Renderer = struct {
         objc.dispatch_release(self.in_flight);
         for (self.buffers) |b| if (b) |buf| objc.release(buf);
         objc.release(self.layer);
+        self.glass.deinit();
         objc.release(self.pipeline);
         objc.release(self.queue);
         objc.release(self.device);
@@ -151,7 +139,7 @@ pub const Renderer = struct {
         };
         const texture = objc.msg(objc.Object, drawable, "texture", .{});
         const buffer = self.upload(instances);
-        const cmd = self.encode(texture, buffer, instances.len, atlas, size, clear);
+        const cmd = self.encode(texture, buffer, instances, atlas, size, clear);
         var done = objc.Block(Renderer, &.{objc.Object}).init(self, frameDone);
         objc.msg(void, cmd, "addCompletedHandler:", .{@as(*anyopaque, @ptrCast(&done))});
         if (self.live_resize) {
@@ -222,7 +210,7 @@ pub const Renderer = struct {
         defer _ = objc.dispatch_semaphore_signal(self.in_flight);
         const t0 = cf.CACurrentMediaTime();
         const buffer = self.upload(instances);
-        const cmd = self.encode(target, buffer, instances.len, atlas, size, clear);
+        const cmd = self.encode(target, buffer, instances, atlas, size, clear);
         objc.msg(void, cmd, "commit", .{});
         const t1 = cf.CACurrentMediaTime();
         objc.msg(void, cmd, "waitUntilCompleted", .{});
@@ -249,7 +237,7 @@ pub const Renderer = struct {
             @as(*const anyopaque, src.ptr), @as(objc.NSUInteger, src.len), @as(objc.NSUInteger, 0),
         });
         defer if (buffer) |b| objc.release(b);
-        const cmd = self.encode(texture, buffer, instances.len, atlas, size, clear);
+        const cmd = self.encode(texture, buffer, instances, atlas, size, clear);
         objc.msg(void, cmd, "commit", .{});
         objc.msg(void, cmd, "waitUntilCompleted", .{});
         const bytes = try gpa.alloc(u8, w * h * 4);
@@ -260,34 +248,87 @@ pub const Renderer = struct {
         return .{ .bytes = bytes, .width = w, .height = h };
     }
 
-    fn encode(self: *Renderer, texture: objc.Object, instance_buffer: ?objc.Object, count: usize, atlas: objc.Object, size: types.Size, clear: types.Color) objc.Object {
-        const pass = objc.msg(objc.Object, objc.class("MTLRenderPassDescriptor"), "renderPassDescriptor", .{});
-        const ca = objc.msg(objc.Object, objc.msg(objc.Object, pass, "colorAttachments", .{}), "objectAtIndexedSubscript:", .{@as(objc.NSUInteger, 0)});
+    /// A pass drawing into `texture`, cleared to `clear` or keeping it.
+    fn pass(cmd: objc.Object, texture: objc.Object, clear: ?types.Color) objc.Object {
+        const desc = objc.msg(objc.Object, objc.class("MTLRenderPassDescriptor"), "renderPassDescriptor", .{});
+        const ca = objc.msg(objc.Object, objc.msg(objc.Object, desc, "colorAttachments", .{}), "objectAtIndexedSubscript:", .{@as(objc.NSUInteger, 0)});
         objc.msg(void, ca, "setTexture:", .{texture});
-        objc.msg(void, ca, "setLoadAction:", .{@as(objc.NSUInteger, 2)}); // clear
+        objc.msg(void, ca, "setLoadAction:", .{@as(objc.NSUInteger, if (clear != null) 2 else 1)}); // clear, or load
         objc.msg(void, ca, "setStoreAction:", .{@as(objc.NSUInteger, 1)}); // store
-        const ClearColor = extern struct { r: f64, g: f64, b: f64, a: f64 };
-        objc.msg(void, ca, "setClearColor:", .{ClearColor{ .r = clear.r, .g = clear.g, .b = clear.b, .a = 1 }});
-
-        const cmd = objc.msg(objc.Object, self.queue, "commandBuffer", .{});
-        const enc = objc.msg(objc.Object, cmd, "renderCommandEncoderWithDescriptor:", .{pass});
-        if (instance_buffer) |buffer| {
-            const viewport: [2]f32 = .{ size.w, size.h };
-            objc.msg(void, enc, "setRenderPipelineState:", .{self.pipeline});
-            objc.msg(void, enc, "setVertexBuffer:offset:atIndex:", .{ buffer, @as(objc.NSUInteger, 0), @as(objc.NSUInteger, 0) });
-            objc.msg(void, enc, "setVertexBytes:length:atIndex:", .{ @as(*const anyopaque, &viewport), @as(objc.NSUInteger, 8), @as(objc.NSUInteger, 1) });
-            objc.msg(void, enc, "setFragmentBuffer:offset:atIndex:", .{ buffer, @as(objc.NSUInteger, 0), @as(objc.NSUInteger, 0) });
-            objc.msg(void, enc, "setFragmentTexture:atIndex:", .{ atlas, @as(objc.NSUInteger, 0) });
-            // Pictures, when there are any; else the atlas stands in (unread).
-            objc.msg(void, enc, "setFragmentTexture:atIndex:", .{ self.images_texture orelse atlas, @as(objc.NSUInteger, 1) });
-            objc.msg(void, enc, "drawPrimitives:vertexStart:vertexCount:instanceCount:", .{
-                @as(objc.NSUInteger, 4), @as(objc.NSUInteger, 0), @as(objc.NSUInteger, 4), @as(objc.NSUInteger, count), // triangle strip
-            });
+        if (clear) |c| {
+            const ClearColor = extern struct { r: f64, g: f64, b: f64, a: f64 };
+            objc.msg(void, ca, "setClearColor:", .{ClearColor{ .r = c.r, .g = c.g, .b = c.b, .a = 1 }});
         }
-        objc.msg(void, enc, "endEncoding", .{});
+        return objc.msg(objc.Object, cmd, "renderCommandEncoderWithDescriptor:", .{desc});
+    }
+
+    /// Draws instances [first, first + count) with `pipeline`.
+    fn drawRange(self: *Renderer, enc: objc.Object, pipeline: objc.Object, buffer: objc.Object, atlas: objc.Object, size: types.Size, first: usize, count: usize) void {
+        const viewport: [2]f32 = .{ size.w, size.h };
+        objc.msg(void, enc, "setRenderPipelineState:", .{pipeline});
+        objc.msg(void, enc, "setVertexBuffer:offset:atIndex:", .{ buffer, @as(objc.NSUInteger, 0), @as(objc.NSUInteger, 0) });
+        objc.msg(void, enc, "setVertexBytes:length:atIndex:", .{ @as(*const anyopaque, &viewport), @as(objc.NSUInteger, 8), @as(objc.NSUInteger, 1) });
+        objc.msg(void, enc, "setFragmentBuffer:offset:atIndex:", .{ buffer, @as(objc.NSUInteger, 0), @as(objc.NSUInteger, 0) });
+        objc.msg(void, enc, "setFragmentTexture:atIndex:", .{ atlas, @as(objc.NSUInteger, 0) });
+        // Pictures, when there are any; else the atlas stands in (unread).
+        objc.msg(void, enc, "setFragmentTexture:atIndex:", .{ self.images_texture orelse atlas, @as(objc.NSUInteger, 1) });
+        objc.msg(void, enc, "drawPrimitives:vertexStart:vertexCount:instanceCount:baseInstance:", .{
+            @as(objc.NSUInteger, 4), @as(objc.NSUInteger, 0), @as(objc.NSUInteger, 4), @as(objc.NSUInteger, count), @as(objc.NSUInteger, first), // triangle strip
+        });
+    }
+
+    fn encode(self: *Renderer, texture: objc.Object, instance_buffer: ?objc.Object, instances: []const Instance, atlas: objc.Object, size: types.Size, clear: types.Color) objc.Object {
+        const cmd = objc.msg(objc.Object, self.queue, "commandBuffer", .{});
+        const buffer = instance_buffer orelse {
+            objc.msg(void, pass(cmd, texture, clear), "endEncoding", .{});
+            return cmd;
+        };
+        const scale: f32 = @as(f32, @floatFromInt(objc.msg(objc.NSUInteger, texture, "width", .{}))) / size.w;
+        var first: usize = 0;
+        var cleared = false;
+        while (true) {
+            // What comes before the next pane, in one draw.
+            const pane_at = metal_glass.next(instances, first);
+            const end = pane_at orelse instances.len;
+            const enc = pass(cmd, texture, if (cleared) null else clear);
+            cleared = true;
+            if (end > first) self.drawRange(enc, self.pipeline, buffer, atlas, size, first, end - first);
+            objc.msg(void, enc, "endEncoding", .{});
+            const at = pane_at orelse break;
+            first = at + 1;
+            // The pane: its backdrop from what was drawn, then the pane.
+            const p = self.glass.backdrop(self.device, cmd, texture, instances[at], scale) orelse continue;
+            const genc = pass(cmd, texture, null);
+            objc.msg(void, genc, "setFragmentBytes:length:atIndex:", .{ @as(*const anyopaque, &p), @as(objc.NSUInteger, @sizeOf(metal_glass.Pane)), @as(objc.NSUInteger, 1) });
+            objc.msg(void, genc, "setFragmentTexture:atIndex:", .{ self.glass.a.?, @as(objc.NSUInteger, 2) });
+            self.drawRange(genc, self.glass.pipeline, buffer, atlas, size, at, 1);
+            objc.msg(void, genc, "endEncoding", .{});
+        }
         return cmd;
     }
 };
+
+fn makePipeline(device: objc.Object, library: objc.Object, comptime fragment: []const u8) !objc.Object {
+    const vs = objc.msg(objc.Object, library, "newFunctionWithName:", .{objc.nsString("vs")});
+    defer objc.release(vs);
+    const fs = objc.msg(objc.Object, library, "newFunctionWithName:", .{objc.nsString(fragment)});
+    defer objc.release(fs);
+    const desc = objc.new("MTLRenderPipelineDescriptor");
+    defer objc.release(desc);
+    objc.msg(void, desc, "setVertexFunction:", .{vs});
+    objc.msg(void, desc, "setFragmentFunction:", .{fs});
+    const attachments = objc.msg(objc.Object, desc, "colorAttachments", .{});
+    const ca = objc.msg(objc.Object, attachments, "objectAtIndexedSubscript:", .{@as(objc.NSUInteger, 0)});
+    objc.msg(void, ca, "setPixelFormat:", .{pixel_format});
+    objc.msg(void, ca, "setBlendingEnabled:", .{objc.YES});
+    // Premultiplied alpha: one, one minus source alpha.
+    objc.msg(void, ca, "setSourceRGBBlendFactor:", .{@as(objc.NSUInteger, 1)});
+    objc.msg(void, ca, "setSourceAlphaBlendFactor:", .{@as(objc.NSUInteger, 1)});
+    objc.msg(void, ca, "setDestinationRGBBlendFactor:", .{@as(objc.NSUInteger, 5)});
+    objc.msg(void, ca, "setDestinationAlphaBlendFactor:", .{@as(objc.NSUInteger, 5)});
+    var err: ?objc.Object = null;
+    return objc.msg(?objc.Object, device, "newRenderPipelineStateWithDescriptor:error:", .{ desc, &err }) orelse error.PipelineCreate;
+}
 
 const pixel_format: objc.NSUInteger = 80; // BGRA8Unorm
 const Images = @import("images.zig").Images;

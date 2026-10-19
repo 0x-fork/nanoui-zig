@@ -2,6 +2,7 @@
 // borders (kind 0), glyph runs and icons sampled from the atlas (kind 1),
 // shadows (kind 2): Gaussian blurs of rounded boxes, as GPUI draws them, or
 // pictures sampled from the image atlas (kind 3), their corners rounded.
+// Panes of glass (kind 4) have their own fragment function (glass.metal).
 // Each is clipped to its clip rectangle, some of whose corners may be
 // rounded (a box with rounded corners that clips its children).
 #include <metal_stdlib>
@@ -87,11 +88,9 @@ static float rounded_box(float2 p, float2 half_size, float r) {
 
 static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float> images);
 
-fragment float4 fs(VOut in [[stage_in]],
-                   constant Instance *instances [[buffer(0)]],
-                   texture2d<float> atlas [[texture(0)]],
-                   texture2d<float> images [[texture(1)]]) {
-    Instance i = instances[in.inst];
+// How much of the fragment the instance's clip lets through: discarded
+// outside it, cut in its rounded corners.
+static float clip_coverage(VOut in, Instance i) {
     if (in.world.x < i.clip.x || in.world.y < i.clip.y || in.world.x > i.clip.z || in.world.y > i.clip.w)
         discard_fragment();
     float clip_cover = 1.0;
@@ -107,6 +106,15 @@ fragment float4 fs(VOut in [[stage_in]],
         if ((uint(corners) & bit) != 0u) clip_cover = 1.0 - smoothstep(-caa, caa, cd);
         if (clip_cover <= 0.0) discard_fragment();
     }
+    return clip_cover;
+}
+
+fragment float4 fs(VOut in [[stage_in]],
+                   constant Instance *instances [[buffer(0)]],
+                   texture2d<float> atlas [[texture(0)]],
+                   texture2d<float> images [[texture(1)]]) {
+    Instance i = instances[in.inst];
+    float clip_cover = clip_coverage(in, i);
     return shade(in, i, atlas, images) * clip_cover;
 }
 

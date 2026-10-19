@@ -62,6 +62,17 @@ Tools). Linux apps need GTK 3 at run time and nothing at build time.
 submodules under `apps/`. To fetch them after a plain clone, run
 `git submodule update --init`.
 
+To use nanoui in your own project, add a release to its `build.zig.zon`:
+
+```sh
+zig fetch --save git+https://github.com/justrach/nanoui#v0.2.0
+```
+
+Releases are tagged `vMAJOR.MINOR.PATCH`, as mygo's are, and each is listed
+under [Releases](https://github.com/justrach/nanoui/releases) with what
+changed. While nanoui is 0.x, a minor release may change the API; a patch
+release won't.
+
 ## Native UI
 
 ```zig
@@ -109,11 +120,43 @@ the state.
   segmented controls, badges, and text fields with IME support.
 - **Images:** pictures decoded once and packed into an atlas.
 - **Look:** light and dark themes that follow the system, eased animations,
-  and Gaussian shadows.
+  Gaussian shadows, and Liquid Glass.
 - **Pointer:** hover that follows ancestry as CSS's `:hover` does, double
   clicks, and pointer tracking for graphs (`c.wants_moves`).
 
 </details>
+
+### Liquid Glass
+
+`.glass(.{})` fills a box with Liquid Glass, the material of macOS 26 and
+later, in place of a background. Whatever was painted under the box shows
+through it: frosted, bent near its edges as through the rim of a lens, and
+lit along a hairline rim. That includes content scrolling under a toolbar
+placed over it with `absolute()`.
+
+```zig
+const bar = ui.div(c).absolute().offset(20, 20).w(420).h(56).row().itemsCenter().px(16).rounded(28).glass(.{});
+defer bar.end();
+ui.text(c, "On glass", .{ .weight = .semibold });
+ui.spacer(c);
+// A prominent button: glass tinted with the accent.
+const tap = ui.div(c).px(16).py(8).rounded(16).glass(.{ .tint = th.accent }).control();
+defer tap.end();
+ui.text(c, "Tap", .{ .color = th.accent_text });
+```
+
+Regular glass frosts and lightens what shows through, or darkens it in dark
+mode, so text on it reads over anything. `.style = .clear` barely frosts it,
+for glass over photos and video. nanoui draws the glass itself, after mygo's
+glass plugin and its measurements of AppKit's `NSGlassEffectView`. Each pane
+averages and blurs what's under it, then shades it on the GPU, and the CPU
+renderer computes the same pixels. It looks the same on Linux and Windows,
+and a test checks the two renderers agree.
+
+<p align="center">
+  <img src="docs/images/gallery-glass.png" alt="A toolbar of Liquid Glass over colored cards, with a tinted button and a pane of clear glass" width="640">
+  <br><sub>The gallery's Glass page.</sub>
+</p>
 
 ## Web pages
 
@@ -238,14 +281,20 @@ sequential calls from the page to native code) took 493 ms with nanoui and
 zig build lines                                                       # the 600-line limit, enforced
 zig build test-bin -Dtarget=aarch64-linux-gnu --prefix zig-out/linux  # Linux tests, for the container
 cd hillclimb && zig build run -- --label "change"                     # benchmarks against mygo and history
+sh tools/version.sh 0.2.1                                             # set the version for a release
 ```
+
+To release, set the version, commit, and push its tag (`git tag v0.2.1 &&
+git push origin v0.2.1`). The release workflow checks that the tag matches
+`build.zig.zon`, runs the tests, and opens the GitHub release.
 
 Rules for working here, by hand or with an agent, are in
 [AGENTS.md](AGENTS.md).
 
 nanoui is a subset of what full frameworks offer. Pages work only on macOS so
-far, and there's no accessibility, bundling, notifications, auto-updates,
-channels or plugins yet. Bound methods run on the main thread.
+far, and there's no accessibility, bundling, notifications, channels or
+plugins yet. Apps update themselves from GitHub releases on macOS
+(`nanoui.Updater`). Bound methods run on the main thread.
 
 ## License
 
@@ -265,7 +314,8 @@ nanoui stands on the shoulders of two projects:
   - a batched outbox with one evaluation per main-loop turn;
   - events held until the page is ready;
   - a generated, typed client;
-  - native UI drawn by the framework.
+  - native UI drawn by the framework;
+  - Liquid Glass drawn by its own renderers, ported from mygo's glass plugin.
 - **[GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui)** by
   [Zed Industries](https://zed.dev). From GPUI, nanoui takes:
   - elements styled by method chains;

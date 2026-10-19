@@ -9,6 +9,8 @@ pub fn build(b: *std.Build) void {
     const portable = b.option(bool, "portable", "Use nanoui's own text and CPU renderer on macOS too (to test that path)") orelse false;
     const options = b.addOptions();
     options.addOption(bool, "portable", portable);
+    // The one place the version is kept: build.zig.zon (tools/version.sh).
+    options.addOption([]const u8, "version", @import("build.zig.zon").version);
 
     const nanoui = b.addModule("nanoui", .{
         .root_source_file = b.path("src/nanoui.zig"),

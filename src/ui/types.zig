@@ -114,6 +114,23 @@ pub const Shadow = struct {
 };
 
 /// The style of a box, in the manner of CSS flexbox.
+/// Liquid Glass, the material of macOS 26 and later (`glass.zig`): what
+/// was painted under the box shows through it, frosted, bent near its
+/// edges as through a lens's rim, and lit along its hairline rim.
+pub const Glass = struct {
+    style: Kind = .regular,
+    /// Colors the glass toward this, by its alpha: a prominent button's.
+    tint: Color = .transparent,
+
+    pub const Kind = enum {
+        /// Frosts and lightens (darkens, in dark mode) what shows through,
+        /// so what is on it reads over anything: bars, buttons, panels.
+        regular,
+        /// Barely frosts or tones it: glass over photos and video.
+        clear,
+    };
+};
+
 pub const Style = struct {
     direction: Direction = .column,
     gap: f32 = 0,
@@ -135,6 +152,8 @@ pub const Style = struct {
     border_width: f32 = 1,
     radius: f32 = 0,
     shadow: ?Shadow = null,
+    /// Filled with Liquid Glass instead of a background.
+    glass: ?Glass = null,
     /// Children are clipped to the box and scroll vertically.
     scroll: bool = false,
     /// Overall opacity of the box and its content.

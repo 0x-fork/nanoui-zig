@@ -80,7 +80,8 @@ pub const UpdateOptions = update.Options;
 /// Runs the event loop for a while (headless tests: replies, processes, timers).
 pub const runFor = @import("platform.zig").runFor;
 
-pub const version = "0.1.0";
+/// nanoui's version, from build.zig.zon (set with tools/version.sh).
+pub const version = @import("build_options").version;
 
 test {
     _ = tsgen;

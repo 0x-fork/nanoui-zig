@@ -155,6 +155,11 @@ pub const Div = struct {
     pub fn shadowLg(d: Div) Div {
         return d.shadow(.{ .color = d.c.theme.shadow.alpha(1.4), .blur = 32, .y = 12 });
     }
+    /// Liquid Glass instead of a background: `.glass(.{})`, or tinted as
+    /// a prominent button, `.glass(.{ .tint = th.accent })`.
+    pub fn glass(d: Div, g: types.Glass) Div {
+        return d.set("glass", @as(?types.Glass, g));
+    }
     pub fn opacity(d: Div, v: f32) Div {
         return d.set("opacity", v);
     }

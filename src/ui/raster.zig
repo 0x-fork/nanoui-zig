@@ -6,6 +6,7 @@
 const std = @import("std");
 const types = @import("types.zig");
 const gpu = @import("gpu.zig");
+const glass = @import("glass.zig");
 
 /// The glyph atlas, as the shader samples it: one byte per texel.
 pub const Mask = struct {
@@ -57,6 +58,7 @@ fn drawOne(out: gpu.Pixels, i: *const gpu.Instance, mask: Mask, pictures: Pictur
     if (i.kind == gpu.Kind.text) return glyph(out, i, mask, scale, b);
     if (i.kind == gpu.Kind.image) return picture(out, i, pictures, scale, b);
     if (i.kind == gpu.Kind.shadow) return shadow(out, i, scale, b);
+    if (i.kind == gpu.Kind.glass) return pane(out, i, scale, b);
     quad(out, i, scale, b);
 }
 
@@ -236,6 +238,32 @@ fn picture(out: gpu.Pixels, i: *const gpu.Instance, p: Pictures, scale: f32, b: 
             if (k <= 0) continue;
             const t = samplePicture(p, i.uv[0] + (i.uv[2] - i.uv[0]) * tx, v);
             blend(out.bytes, row + x * 4, t[2] * k, t[1] * k, t[0] * k, t[3] * k);
+        }
+    }
+}
+
+/// A pane of glass over what was drawn before it, as `glass.metal` draws
+/// it: its backdrop read from the pixels so far, then its color at each
+/// pixel, by its rounded edge's coverage.
+fn pane(out: gpu.Pixels, i: *const gpu.Instance, scale: f32, b: [4]usize) void {
+    const plan = glass.backdropOf(i.rect, i.border_width, scale, out.width, out.height) orelse return;
+    const im = glass.readBackdrop(std.heap.page_allocator, out, plan) catch return;
+    defer std.heap.page_allocator.free(im.pix);
+    const inv = 1 / scale;
+    const hw = i.rect[2] * 0.5;
+    const hh = i.rect[3] * 0.5;
+    const r = @min(i.radius, @min(hw, hh));
+    for (b[1]..b[3]) |y| {
+        const wy = (@as(f32, @floatFromInt(y)) + 0.5) * inv;
+        const row = y * out.width * 4;
+        for (b[0]..b[2]) |x| {
+            const wx = (@as(f32, @floatFromInt(x)) + 0.5) * inv;
+            const sd = roundedBox(wx - i.rect[0] - hw, wy - i.rect[1] - hh, hw, hh, r);
+            const aa = @max(sd[1] * inv, 0.0001) * 0.5;
+            const k = (1 - smoothstep(-aa, aa, sd[0])) * clipCover(i, wx, wy, inv) * i.uv[2];
+            if (k <= 0) continue;
+            const c = glass.color(i, im, @as(f32, @floatFromInt(x)) + 0.5, @as(f32, @floatFromInt(y)) + 0.5, scale);
+            blend(out.bytes, row + x * 4, c[0] * k, c[1] * k, c[2] * k, k);
         }
     }
 }

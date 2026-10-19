@@ -15,6 +15,12 @@ in [`third_party/licenses/mygo-MIT.txt`](third_party/licenses/mygo-MIT.txt)
 (as of mygo
 [`269e2f9`](https://github.com/egoist/mygo/tree/269e2f9aca82b742f67497e467a95f6adb54bf5d)).
 
+Liquid Glass (`src/ui/glass.zig`, `src/ui/glass.metal`, `src/ui/metal_glass.zig`)
+is ported from mygo's glass plugin, as of
+[`c7361ec`](https://github.com/egoist/mygo/tree/c7361ec842f475ebc0c1c6145912a823b46af220/plugins/glass).
+That covers the material measured from AppKit, the lens, the normal, the tone
+curve, and the backdrop, averaged and blurred. It's under the same license.
+
 ## GPUI
 
 nanoui's native UI follows designs from

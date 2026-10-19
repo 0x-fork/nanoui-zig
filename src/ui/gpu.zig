@@ -1,6 +1,6 @@
 //! What the renderers draw, whichever draws it: instanced quads that are
 //! rounded rectangles with borders, glyphs and icons from the atlas,
-//! shadows, or pictures from the image atlas, each clipped. Metal draws them on macOS (`metal.zig`, with
+//! shadows, pictures from the image atlas, or panes of glass, each clipped. Metal draws them on macOS (`metal.zig`, with
 //! `shader.metal`); `raster.zig` draws the same pixels on the CPU.
 const types = @import("types.zig");
 const std = @import("std");
@@ -40,6 +40,11 @@ pub const Kind = struct {
     pub const shadow: f32 = 2;
     /// A picture from the image atlas (`images.zig`), its corners rounded.
     pub const image: f32 = 3;
+    /// A pane of Liquid Glass over what was drawn before it (`glass.zig`):
+    /// `color` its tint, `uv` its bezel, refraction, opacity and rim width,
+    /// `border_color` its tone (low, high, curve, saturation), and
+    /// `border_width` the blur of what shows through, all in points.
+    pub const glass: f32 = 4;
 };
 
 pub fn color4(c: types.Color) [4]f32 {

@@ -84,6 +84,9 @@ src/ui/shaper.zig     the exact fast path for printable ASCII
 src/ui/atlas.zig      the glyph and SF Symbol atlas, growing
 src/ui/metal.zig      the renderer: one pipeline, ring of instance buffers
 src/ui/shader.metal   rounded rects, borders, glyphs, Gaussian shadows
+src/ui/glass.zig      Liquid Glass: the material, backdrop and optics (CPU too)
+src/ui/glass.metal    the glass's backdrop kernels and fragment function
+src/ui/metal_glass.zig  panes of glass in the Metal renderer
 src/ui/surface.zig    the NSView: events, display link, occlusion, resize
 src/ui/tester.zig     views without a window: input, time, PNG snapshots
 src/ui/tests.zig      widget tests through the Tester
@@ -103,6 +106,8 @@ hillclimb/            headless benchmarks against mygo (its own package)
 apps/nanoterm/        the first app: a Warp-like terminal with ACP agents
 apps/nanomon/         a small activity monitor (libproc, Mach, /proc)
 tools/lines.zig       the 600-line check
+tools/version.sh      set or check the version (build.zig.zon) for a release
+.github/workflows/    CI (tests on macOS and Linux) and releases from v* tags
 ```
 
 ## Commands
@@ -117,6 +122,7 @@ zig build run-hello       # webview + typed IPC
 zig build run-counter     # native UI
 zig build run-gallery     # native UI widgets
 zig build gen             # write examples/hello/frontend/nanoui.{js,d.ts}
+sh tools/version.sh 0.2.1 # set the version; commit, push tag v0.2.1 to release
 cd hillclimb && zig build run -- --label "change"   # climb: compare with mygo and history
 cd apps/nanomon && zig build test --fork=../..     # an app (a submodule) against this nanoui, not its pinned one
 

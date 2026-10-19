@@ -39,6 +39,7 @@ pub const Length = types.Length;
 pub const Style = types.Style;
 pub const TextStyle = types.TextStyle;
 pub const Shadow = types.Shadow;
+pub const Glass = types.Glass;
 pub const Weight = types.Weight;
 
 pub const key = widgets.key;
@@ -110,6 +111,8 @@ test {
     if (!@import("text.zig").portable) _ = @import("shaper.zig");
     _ = @import("raster.zig");
     _ = @import("tests_raster.zig");
+    _ = @import("glass.zig");
+    _ = @import("tests_glass.zig");
     _ = @import("tt/raster.zig");
     _ = @import("tt/tests.zig");
     _ = @import("png.zig");
