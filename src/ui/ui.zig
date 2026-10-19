@@ -113,6 +113,8 @@ test {
     _ = textfield;
     _ = @import("tests.zig");
     _ = @import("tests_keymap.zig");
+    _ = @import("keymap.zig");
+    _ = @import("undo.zig");
     _ = @import("tests_cursor.zig");
     // CoreText's fast path, on macOS.
     if (!@import("text.zig").portable) _ = @import("shaper.zig");

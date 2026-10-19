@@ -113,8 +113,9 @@ pub const Result = struct {
     accepted: bool = false,
     /// The caret's byte offset after this frame's edits.
     caret: usize = 0,
-    /// Vim's normal mode is on (for a mode indicator).
+    /// Vim's normal mode is on, and visual mode in it (for a mode indicator).
     vim_normal: bool = false,
+    vim_visual: bool = false,
     /// Vim's j and k in normal mode: -1 back through history, 1 forward.
     history: i8 = 0,
 };
@@ -307,7 +308,9 @@ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
             }
             if (!c.input.down) e.selecting = false;
         }
-        // Emacs's and Vim's keys first; what they take isn't typed.
+        // Emacs's and Vim's keys first; what they take isn't typed. Their
+        // undo history: the text before this event, and after it.
+        if (opts.keys != .system) e.undo.begin(buffer.text(), e.caret);
         const took: keymap.Took = if (opts.keys != .system) keymap.handle(c, buffer, e, opts, &result) else .{};
         for (c.input.ops) |op| {
             if (took.text and op == .insert) continue;
@@ -329,6 +332,11 @@ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
             .escape => c.focus = 0,
             else => {},
         };
+        if (opts.keys != .system) {
+            var typing = !took.text and !took.key and c.input.key == null and (c.input.chars.len > 0 or c.input.ops.len > 0);
+            for (c.input.ops) |op| typing = typing and op == .insert;
+            e.undo.commit(buffer.text(), e.caret, result.changed, typing);
+        }
         if (result.changed or result.submitted) c.changed = true;
         // Escape gave the focus up during this build.
         if (c.focus != it.id) {
@@ -343,7 +351,8 @@ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
     const focused = it.focused and c.focus == it.id;
     result.focused = focused;
     result.caret = e.caret;
-    result.vim_normal = opts.keys == .vim and e.vim_normal;
+    result.vim_normal = opts.keys == .vim and e.keys.vim_normal;
+    result.vim_visual = result.vim_normal and e.keys.vim_visual;
     const s = buffer.text();
     const shown = shownOf(s, opts.password, bullets);
     const lh = c.text.font(style).lineHeight();

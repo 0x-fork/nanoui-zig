@@ -102,13 +102,36 @@ pub const EditState = struct {
     scroll_x: f32 = 0,
     /// Pressed in the field: dragging extends the selection.
     selecting: bool = false,
-    /// Emacs and Vim keys (keymap.zig): what was last killed (^K, ^U,
-    /// ^W, dd), for ^Y and p; Vim's normal mode and an operator waiting
-    /// for its motion (d, c).
-    killed: [256]u8 = undefined,
-    killed_len: usize = 0,
+    /// Emacs's and Vim's keys (keymap.zig) and the undo history.
+    keys: KeyState = .{},
+    undo: @import("undo.zig").History = .{},
+};
+
+/// What Emacs's and Vim's keys remember between events.
+pub const KeyState = struct {
+    /// What was killed or yanked, newest first: ^Y and p put back the
+    /// first, M-y the ones before it.
+    ring: [4][256]u8 = undefined,
+    ring_len: [4]u16 = @splat(0),
+    ring_count: u8 = 0,
+    /// The last command killed (the next kill joins it), or put back
+    /// [from, to) from ring entry `yank_at` (M-y swaps it for an older one).
+    last_kill: bool = false,
+    yanked: ?[2]usize = null,
+    yank_at: u8 = 0,
+    /// Emacs's mark (C-Space): the region is from it to the caret.
+    mark: ?usize = null,
+    /// Vim: normal or visual mode (where visual began); a count, an
+    /// operator (d c y) and its count, a key waiting for the next one
+    /// (f F t T r g, i a after an operator); the last f F t T and its char.
     vim_normal: bool = false,
-    vim_pending: u8 = 0,
+    vim_visual: bool = false,
+    vim_anchor: usize = 0,
+    vim_count: u16 = 0,
+    vim_op: u8 = 0,
+    vim_op_count: u16 = 0,
+    vim_prefix: u8 = 0,
+    vim_find: [2]u8 = .{ 0, 0 },
 };
 
 pub const Input = struct {
