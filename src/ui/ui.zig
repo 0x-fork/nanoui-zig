@@ -117,7 +117,10 @@ test {
     _ = @import("undo.zig");
     _ = @import("tests_cursor.zig");
     // CoreText's fast path, on macOS.
-    if (!@import("text.zig").portable) _ = @import("shaper.zig");
+    if (!@import("text.zig").portable) {
+        _ = @import("shaper.zig");
+        _ = @import("tests_wrap.zig");
+    }
     _ = @import("raster.zig");
     _ = @import("tests_raster.zig");
     _ = @import("glass.zig");
