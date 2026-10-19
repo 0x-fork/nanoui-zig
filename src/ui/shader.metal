@@ -135,7 +135,13 @@ static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float
         constexpr sampler s(filter::linear, address::clamp_to_edge);
         float aa = max(fwidth(d), 0.0001) * 0.5;
         float coverage = 1.0 - smoothstep(-aa, aa, d);
-        return images.sample(s, in.uv) * (coverage * i.color.a);
+        float4 px = images.sample(s, in.uv);
+        // Tinted: the picture's shape in one color (a mark following the theme).
+        if (i.border_color.a > 0.0) {
+            float a = px.a * i.border_color.a * coverage * i.color.a;
+            return float4(i.border_color.rgb * a, a);
+        }
+        return px * (coverage * i.color.a);
     }
 
     if (i.kind == 2.0) {

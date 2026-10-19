@@ -237,6 +237,12 @@ fn picture(out: gpu.Pixels, i: *const gpu.Instance, p: Pictures, scale: f32, b: 
             const k = (1 - smoothstep(-aa, aa, sd[0])) * i.color[3] * clipCover(i, wx, wy, inv);
             if (k <= 0) continue;
             const t = samplePicture(p, i.uv[0] + (i.uv[2] - i.uv[0]) * tx, v);
+            if (i.border_color[3] > 0) {
+                // Tinted: the shape in one color, as the shader draws it.
+                const a = t[3] * i.border_color[3] * k;
+                blend(out.bytes, row + x * 4, i.border_color[0] * a, i.border_color[1] * a, i.border_color[2] * a, a);
+                continue;
+            }
             blend(out.bytes, row + x * 4, t[2] * k, t[1] * k, t[0] * k, t[3] * k);
         }
     }

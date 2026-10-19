@@ -24,6 +24,8 @@ pub const Content = union(enum) {
         key: u64,
         bytes: []const u8,
         opacity: f32 = 1,
+        /// Its shape (alpha) filled with this color: a monochrome mark.
+        tint: ?types.Color = null,
     };
 
     pub const Icon = struct {

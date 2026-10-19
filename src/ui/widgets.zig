@@ -120,6 +120,9 @@ pub const ImageOptions = struct {
     /// Pixels a point the picture was made at: 2 for a Retina screenshot,
     /// 1 for most pictures on the web (a badge).
     scale: f32 = 2,
+    /// Draws only the picture's shape, in this color: a monochrome mark (a
+    /// logo) that follows the theme.
+    tint: ?types.Color = null,
 };
 
 /// A picture; false (and nothing drawn) if it can't be decoded.
@@ -130,7 +133,7 @@ pub fn image(c: *Context, opts: ImageOptions) bool {
     const w: f32 = @as(f32, @floatFromInt(e.width)) / @max(opts.scale, 0.5);
     const h: f32 = @as(f32, @floatFromInt(e.height)) / @max(opts.scale, 0.5);
     const s = @min(1, @min(opts.max_width / @max(w, 1), opts.max_height / @max(h, 1)));
-    _ = c.leaf(.{ .width = .{ .px = @round(w * s) }, .height = .{ .px = @round(h * s) }, .radius = opts.radius }, .{ .image = .{ .key = k, .bytes = opts.bytes, .opacity = opts.opacity } }, null);
+    _ = c.leaf(.{ .width = .{ .px = @round(w * s) }, .height = .{ .px = @round(h * s) }, .radius = opts.radius }, .{ .image = .{ .key = k, .bytes = opts.bytes, .opacity = opts.opacity, .tint = opts.tint } }, null);
     return true;
 }
 
