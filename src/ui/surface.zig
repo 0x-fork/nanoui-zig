@@ -177,6 +177,7 @@ pub const Surface = struct {
         const now = cf.CACurrentMediaTime();
         const dt: f32 = if (self.last_frame_time > 0) @floatCast(@min(now - self.last_frame_time, 0.1)) else 1.0 / 60.0;
         self.last_frame_time = now;
+        c.reduced_motion = reduceMotion();
         const r = frame_mod.run(c, self.view, &self.text, &self.instances, self.size, self.scale, self.theme(), dt, now - self.start_time);
         self.renderer.syncImages(&self.text.images);
         self.renderer.textures = c.textures.items;
@@ -513,4 +514,10 @@ fn updateTrackingAreas(obj: objc.Object, _: objc.SEL) callconv(.c) void {
     });
     objc.msg(void, obj, "addTrackingArea:", .{area});
     s.tracking = area;
+}
+
+/// System Settings, Accessibility, Display, Reduce motion.
+fn reduceMotion() bool {
+    const ws = objc.msg(objc.Object, objc.class("NSWorkspace"), "sharedWorkspace", .{});
+    return objc.msg(objc.BOOL, ws, "accessibilityDisplayShouldReduceMotion", .{});
 }
