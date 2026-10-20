@@ -58,6 +58,18 @@ pub fn build(b: *std.Build) void {
         }
     }
 
+    // The 30-second reel of ui.motion (tools/reel.sh adds the sound).
+    const reel = b.addExecutable(.{
+        .name = "nanoui-reel",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/reel/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "nanoui", .module = nanoui }},
+        }),
+    });
+    b.step("reel", "Build the motion reel (zig-out/bin/nanoui-reel)").dependOn(&b.addInstallArtifact(reel, .{}).step);
+
     const tests = b.addTest(.{ .root_module = nanoui });
     b.step("test", "Run unit tests").dependOn(&b.addRunArtifact(tests).step);
     // The tests as a program, for another machine (Linux in a container).
