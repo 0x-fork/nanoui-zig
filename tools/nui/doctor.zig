@@ -20,8 +20,16 @@ pub fn run(a: std.mem.Allocator, io: std.Io, out: *cli.Out) !void {
     out.done(.{ .zig = zig_version, .os = os, .arch = @tagName(builtin.cpu.arch) }, &.{});
 }
 
+/// Whether libgtk-3.so.0 is where the dynamic loader finds it (nui itself
+/// is static, so it looks rather than loads).
 fn gtk() bool {
-    var lib = std.DynLib.open("libgtk-3.so.0") catch return false;
-    lib.close();
-    return true;
+    const arch = @tagName(builtin.cpu.arch);
+    const dirs = [_][]const u8{ "/usr/lib/" ++ arch ++ "-linux-gnu", "/lib/" ++ arch ++ "-linux-gnu", "/usr/lib64", "/usr/lib", "/lib64", "/lib", "/usr/local/lib" };
+    var buf: [256]u8 = undefined;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    for (dirs) |d| {
+        const p = std.fmt.bufPrint(&buf, "{s}/libgtk-3.so.0", .{d}) catch continue;
+        if (std.Io.Dir.cwd().access(io, p, .{})) |_| return true else |_| {}
+    }
+    return false;
 }
