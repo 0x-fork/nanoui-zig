@@ -88,6 +88,7 @@ src/ui/glass.zig      Liquid Glass: the material, backdrop and optics (CPU too)
 src/ui/glass.metal    the glass's backdrop kernels and fragment function
 src/ui/metal_glass.zig  panes of glass in the Metal renderer
 src/ui/surface.zig    the NSView: events, display link, occlusion, resize
+src/ui/motion/        ui.motion: springs, tweens, presence, keyframes, layout animation
 src/ui/tester.zig     views without a window: input, time, PNG snapshots
 src/ui/tests.zig      widget tests through the Tester
 src/ui/text_tt.zig    text where nanoui shapes it itself (Linux, Windows)
@@ -100,6 +101,7 @@ src/platform.zig      what differs by OS below the UI (event loop, clipboard)
 src/linux/            GTK 3 backend: app, window, surface, dialogs, fd watches
 src/windows/          Win32 backend: app, window, surface, dialogs
 src/menu_accel.zig    menus as accelerators (Linux, Windows)
+src/kit/              nanoui.kit: components after GPUI Kit (buttons, overlays, tabs, forms)
 tools/*.Dockerfile    Linux (GTK, Xvfb) and Windows (Wine) test images
 examples/             hello (webview), counter and gallery (native UI)
 hillclimb/            headless benchmarks against mygo (its own package)
