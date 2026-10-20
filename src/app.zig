@@ -33,6 +33,20 @@ pub const App = struct {
     stopping: bool = false,
     /// `NANOUI_DEBUG=1`: log windows' ids and frames, for tools and tests.
     debug: bool = false,
+    /// Files the system asks the app to open (Finder's Open With, `open -a`,
+    /// a file named when it was launched); without it they're ignored.
+    open_files: ?OpenFiles = null,
+
+    pub const OpenFiles = struct {
+        ctx: *anyopaque,
+        /// The files' paths, valid for the call.
+        func: *const fn (ctx: *anyopaque, paths: []const []const u8) void,
+    };
+
+    /// Takes the files the system asks the app to open.
+    pub fn onOpenFiles(self: *App, ctx: *anyopaque, func: *const fn (ctx: *anyopaque, paths: []const []const u8) void) void {
+        self.open_files = .{ .ctx = ctx, .func = func };
+    }
 
     /// Creates the app. Call from `main`, on the main thread.
     pub fn create(init: std.process.Init, options: Options) !*App {
@@ -51,6 +65,8 @@ pub const App = struct {
                 .{ .name = "applicationDidFinishLaunching:", .imp = &didFinishLaunching, .types = "v@:@" },
                 .{ .name = "applicationShouldTerminate:", .imp = &shouldTerminate, .types = "Q@:@" },
                 .{ .name = "applicationShouldHandleReopen:hasVisibleWindows:", .imp = &shouldReopen, .types = "c@:@c" },
+                // Opening files: handled (or ignored), never AppKit's "can't open" alert.
+                .{ .name = "application:openURLs:", .imp = &openURLs, .types = "v@:@@" },
             },
         });
         const delegate = objc.msg(objc.Object, delegate_class, "new", .{});
@@ -249,6 +265,24 @@ fn didFinishLaunching(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callco
     if (objc.getZig(App, self_obj)) |app| if (app.flags.hidden) return;
     const nsapp = objc.msg(objc.Object, objc.class("NSApplication"), "sharedApplication", .{});
     objc.msg(void, nsapp, "activateIgnoringOtherApps:", .{objc.YES});
+}
+
+fn openURLs(self_obj: objc.Object, _: objc.SEL, _: objc.Object, urls: objc.Object) callconv(.c) void {
+    const app = objc.getZig(App, self_obj) orelse return;
+    const handler = app.open_files orelse return;
+    const pool = objc.Pool.push();
+    defer pool.pop();
+    var paths: std.ArrayList([]const u8) = .empty;
+    defer paths.deinit(app.gpa);
+    const n = objc.msg(objc.NSUInteger, urls, "count", .{});
+    var i: objc.NSUInteger = 0;
+    while (i < n) : (i += 1) {
+        const url = objc.msg(objc.Object, urls, "objectAtIndex:", .{i});
+        if (objc.msg(objc.BOOL, url, "isFileURL", .{}) == objc.NO) continue;
+        const path = objc.fromNSString(objc.msg(?objc.Object, url, "path", .{}));
+        if (path.len > 0) paths.append(app.gpa, path) catch {};
+    }
+    if (paths.items.len > 0) handler.func(handler.ctx, paths.items);
 }
 
 fn shouldTerminate(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) objc.NSUInteger {

@@ -103,6 +103,10 @@ pub const App = struct {
         after(0, ctx, func);
     }
 
+    /// Files the system asks the app to open: on macOS only; here a file
+    /// is named on the command line, which the app reads itself.
+    pub fn onOpenFiles(_: *App, _: *anyopaque, _: *const fn (ctx: *anyopaque, paths: []const []const u8) void) void {}
+
     /// Calls `func(ctx)` on the main thread after `ms` milliseconds.
     pub fn after(ms: u64, ctx: ?*anyopaque, func: *const fn (?*anyopaque) callconv(.c) void) void {
         const Timer = struct {
