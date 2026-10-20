@@ -97,6 +97,7 @@ test {
     _ = @import("update_portable.zig");
     if (!mac) {
         inline for (.{ plat.app, plat.window, plat.menu, plat.dialog, plat.desktop, plat.fdwatch, }) |m| std.testing.refAllDecls(m);
+        if (builtin.os.tag == .windows) _ = @import("windows/d3d.zig");
         return;
     }
     // Analyze every declaration, used by an example or not.

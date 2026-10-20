@@ -1,5 +1,6 @@
 //! Native UI on Windows: the window's client area shows frames the CPU
-//! renderer draws (GDI copies them, at the monitor's DPI), fed the mouse,
+//! renderer draws, presented through a Direct3D 11 flip swap chain
+//! (d3d.zig; GDI copies them where there's no Direct3D), fed the mouse,
 //! the wheel, keys and typed characters from the window procedure. Frames
 //! run on input and while something animates (a 60 Hz timer); idle,
 //! nothing runs.
@@ -16,6 +17,7 @@ const clock = @import("../ui/clock.zig");
 const Theme = @import("../ui/theme.zig").Theme;
 const Context = ctx_mod.Context;
 const Window = @import("window.zig").Window;
+const d3d = @import("d3d.zig");
 
 /// Posted for a frame requested from outside the view.
 pub const WM_FRAME = w.WM_APP + 1;
@@ -46,6 +48,9 @@ pub const Surface = struct {
     /// A UTF-16 high surrogate waiting for its other half.
     high: u16 = 0,
     chars: [8]u8 = undefined,
+    /// Frames go to the screen through this, once made; GDI if it can't be.
+    presenter: ?d3d.Presenter = null,
+    no_d3d: bool = false,
 
     pub fn create(window: *Window, view: ui.View, theme_override: ?Theme) !*Surface {
         const gpa = window.app.gpa;
@@ -56,6 +61,7 @@ pub const Surface = struct {
     }
 
     pub fn destroy(self: *Surface) void {
+        if (self.presenter) |*p| p.deinit();
         self.instances.deinit(self.gpa);
         self.gpa.free(self.pixels);
         self.ctx.deinit();
@@ -122,9 +128,39 @@ pub const Surface = struct {
         defer _ = w.EndPaint(h, &ps);
         if (self.stale or self.pixels.len == 0) self.render();
         if (self.pixels.len == 0) return;
+        if (self.present(h)) return;
         // A negative height: rows from the top, as the renderer writes them.
         const info: w.BITMAPINFOHEADER = .{ .biWidth = @intCast(self.pixel_w), .biHeight = -@as(i32, @intCast(self.pixel_h)) };
         _ = w.SetDIBitsToDevice(dc, 0, 0, @intCast(self.pixel_w), @intCast(self.pixel_h), 0, 0, 0, @intCast(self.pixel_h), self.pixels.ptr, &info, 0);
+    }
+
+    /// Presents the frame through the swap chain (made the first time);
+    /// false to draw with GDI instead. A lost device is made again next frame.
+    fn present(self: *Surface, h: w.HWND) bool {
+        if (self.no_d3d) return false;
+        const pw: u32 = @intCast(self.pixel_w);
+        const ph: u32 = @intCast(self.pixel_h);
+        if (self.presenter == null) {
+            self.presenter = d3d.Presenter.init(h, pw, ph) catch {
+                self.no_d3d = true;
+                return false;
+            };
+        }
+        const p = &self.presenter.?;
+        const bg = self.ctx.theme.background;
+        p.setBackground(bg.r, bg.g, bg.b);
+        p.upload(self.pixels, pw, ph) catch {
+            p.deinit();
+            self.presenter = null;
+            return false;
+        };
+        if (!p.present()) {
+            p.deinit();
+            self.presenter = null;
+            self.stale = true;
+            _ = w.InvalidateRect(h, null, 0);
+        }
+        return true;
     }
 
     fn updateCursor(self: *Surface) void {
