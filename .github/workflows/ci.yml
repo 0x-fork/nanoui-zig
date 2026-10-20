@@ -46,4 +46,6 @@ jobs:
       - uses: mlugg/setup-zig@v2
         with:
           version: 0.17.0
+      # Tests write their pictures to /tmp: on Windows, \tmp on this drive.
+      - run: New-Item -ItemType Directory -Force -Path \tmp | Out-Null
       - run: zig build test
