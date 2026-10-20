@@ -16,23 +16,26 @@ const apps = struct {
     const music = @import("app_music.zig");
     const weather = @import("app_weather.zig");
     const settings = @import("app_settings.zig");
+    const glass = @import("app_glass.zig");
 };
+const palette = @import("theme.zig");
 
 /// Points; drawn at 1.5× for 1920 × 1080.
 pub const width = 1280;
 pub const height = 720;
 
-pub const App = enum { trade, chat, board, music, weather, settings };
+pub const App = enum { trade, chat, board, music, glass, weather, settings };
 
 /// When each part begins.
 pub const at = struct {
-    pub const trade = 2.4;
-    pub const chat = 7.0;
-    pub const board = 11.4;
-    pub const music = 15.6;
-    pub const weather = 19.8;
-    pub const settings = 24.2;
-    pub const end = 27.6;
+    pub const trade = 2.2;
+    pub const chat = 6.2;
+    pub const board = 10.0;
+    pub const music = 13.8;
+    pub const glass = 17.4;
+    pub const weather = 21.4;
+    pub const settings = 24.8;
+    pub const end = 27.8;
     pub const done = 30.0;
 };
 
@@ -43,8 +46,9 @@ const metas = [_]Meta{
     .{ .app = .chat, .start = at.chat, .w = 760, .h = 600, .title = "Messages", .tag = "present · layout", .line = "messages spring in and the list makes room" },
     .{ .app = .board, .start = at.board, .w = 1100, .h = 600, .title = "Board", .tag = "layout · springs", .line = "a card lifts, glides to Done, and the column closes up" },
     .{ .app = .music, .start = at.music, .w = 900, .h = 600, .title = "Music", .tag = "springs · keyframes", .line = "the cover grows on play; the bars dance in a loop" },
+    .{ .app = .glass, .start = at.glass, .w = 900, .h = 560, .title = "Photos", .tag = "glass · interactive · morph", .line = "glass swells on touch; a button morphs into a panel" },
     .{ .app = .weather, .start = at.weather, .w = 1000, .h = 620, .title = "Weather", .tag = "glass · kit.tabs", .line = "glass cards, a sliding lens, temperatures counting" },
-    .{ .app = .settings, .start = at.settings, .w = 720, .h = 600, .title = "Settings", .tag = "nanoui.kit", .line = "toggles, an accordion that opens, a toast" },
+    .{ .app = .settings, .start = at.settings, .w = 720, .h = 600, .title = "Settings", .tag = "nanoui.kit", .line = "a new theme crossfades in; an accordion opens; a toast" },
 };
 
 pub fn appAt(t: f32) ?App {
@@ -77,11 +81,20 @@ pub const Director = struct {
     music: apps.music.State = .{},
     weather: apps.weather.State = .{},
     settings: apps.settings.State = .{},
+    glass: apps.glass.State = .{},
     toaster: kit.Toaster,
     cursor: [2]f32 = .{ 1100, 640 },
     cursor_alpha: f32 = 0,
 
     pub fn draw(d: *Director, c: *ui.Context) void {
+        // Settings' theme, picked, crossfades everything to it.
+        const want: f32 = switch (d.settings.theme) {
+            1 => 0,
+            2 => 1,
+            else => if (d.dark) 1 else 0,
+        };
+        const t = motion.number(c, "theme", want, .{ .tween = .{ .duration = 0.6, .ease = .ease_in_out } });
+        c.theme = mixTheme(palette.ui_(false), palette.ui_(true), t);
         const th = c.theme;
         const root = ui.div(c).sizeFull().bg(th.background.mix(th.text, if (d.dark) 0.04 else 0.03));
         defer root.end();
@@ -143,6 +156,7 @@ fn window(c: *ui.Context, d: *Director) void {
                 .board => apps.board.view(c, &d.board, mm.w),
                 .music => apps.music.view(c, &d.music),
                 .weather => apps.weather.view(c, &d.weather, mm.w, mm.h - 44),
+                .glass => apps.glass.view(c, &d.glass, mm.w, mm.h - 44),
                 .settings => apps.settings.view(c, &d.settings),
             }
         }
@@ -223,4 +237,14 @@ fn cursor(c: *ui.Context, d: *Director) void {
     const p = ui.div(c).fixed().offset(d.cursor[0] - 4, d.cursor[1] - 3).layer(90).opacity(d.cursor_alpha);
     defer p.end();
     ui.icon(c, "cursorarrow", .{ .size = 30, .weight = .regular, .color = c.theme.text });
+}
+
+/// Theme `a` turned `t` of the way into theme `b`, color by color.
+fn mixTheme(a: ui.Theme, b: ui.Theme, t: f32) ui.Theme {
+    var r = a;
+    inline for (@typeInfo(ui.Theme).@"struct".field_names) |name| {
+        if (@TypeOf(@field(r, name)) == ui.Color) @field(r, name) = @field(a, name).mix(@field(b, name), t);
+    }
+    r.dark = t > 0.5;
+    return r;
 }

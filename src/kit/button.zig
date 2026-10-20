@@ -85,17 +85,20 @@ pub fn button(c: *ui.Context, label: []const u8, opts: Options) ui.Interaction {
     n.style.border = l.border;
     if (opts.variant == .default and !opts.glass) n.style.shadow = .{ .color = t.shadow.alpha(0.4), .blur = 2, .y = 1 };
     if (opts.glass) {
-        // The variant's color tints the glass; clear variants stay clear.
+        // The variant's color tints the glass (prominent glass); clear
+        // variants stay clear, and light up under a press, as interactive
+        // glass does.
         const tinted = l.bg.a > 0.99 and opts.variant != .default and opts.variant != .secondary;
-        n.style.glass = .{ .tint = if (tinted) l.bg.alpha(0.85) else .transparent };
+        n.style.glass = .{ .tint = if (tinted) l.bg.alpha(0.85 + 0.12 * press) else ui.Color.white.alpha(0.22 * press) };
         n.style.background = null;
         n.style.border = null;
     }
     n.style.opacity = if (opts.disabled) 0.45 else 1;
-    // A spring: down on a press, up a touch on hover, a bounce on release.
-    const give: f32 = if (opts.glass) 0.07 else 0.035;
-    const lift: f32 = if (opts.glass) 0.03 else 0;
-    n.style.scale = ui.motion.number(c, "scale", if (live and it.pressed) 1 - give else if (live and it.hovered) 1 + lift else 1, .{ .spring = ui.motion.Spring.bouncy });
+    // A spring and a bounce on release: a solid button gives under a press;
+    // glass swells, as iOS's interactive glass does.
+    const pressed_to: f32 = if (opts.glass) 1.08 else 0.965;
+    const hover_to: f32 = if (opts.glass) 1.03 else 1;
+    n.style.scale = ui.motion.number(c, "scale", if (live and it.pressed) pressed_to else if (live and it.hovered) hover_to else 1, .{ .spring = ui.motion.Spring.bouncy });
     var fg = if (opts.glass and n.style.glass.?.tint.a == 0) t.foreground else l.fg;
     if (plain) fg = fg.mix(t.muted, hover * 0.35);
     if (opts.loading) {

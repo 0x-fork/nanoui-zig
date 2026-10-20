@@ -22,9 +22,14 @@ const at = scenes.at;
 const fps = 30;
 const scale = 1.5;
 
-const Target = union(enum) { point: [2]f32, text: []const u8 };
+const Target = union(enum) {
+    point: [2]f32,
+    text: []const u8,
+    /// Settings' other theme: Dark in the light reel, Light in the dark.
+    other_theme,
+};
 
-const Act = enum { none, click, send, lift_ship, lift_docs, play, next, save };
+const Act = enum { none, click, send, lift_ship, lift_docs, play, next, save, morph };
 
 const Move = struct { at: f32, dur: f32, to: Target, act: Act = .none };
 
@@ -42,11 +47,17 @@ const moves = [_]Move{
     // Music: play, then the next track.
     .{ .at = at.music + 0.4, .dur = 0.6, .to = .{ .point = .{ 398, 542 } }, .act = .play },
     .{ .at = at.music + 2.2, .dur = 0.4, .to = .{ .point = .{ 473, 542 } }, .act = .next },
+    // Glass: interactive glass pressed; a button morphs into a panel.
+    .{ .at = at.glass + 0.3, .dur = 0.5, .to = .{ .text = "Share" }, .act = .click },
+    .{ .at = at.glass + 1.0, .dur = 0.3, .to = .{ .text = "Save" }, .act = .click },
+    .{ .at = at.glass + 1.5, .dur = 0.4, .to = .{ .point = .{ 1034, 569 } }, .act = .morph },
+    .{ .at = at.glass + 2.4, .dur = 0.4, .to = .{ .text = "Albums" }, .act = .click },
+    .{ .at = at.glass + 3.1, .dur = 0.35, .to = .{ .point = .{ 1042, 405 } }, .act = .morph },
     // Weather: other days, the lens sliding.
     .{ .at = at.weather + 0.9, .dur = 0.6, .to = .{ .text = "Tomorrow" }, .act = .click },
     .{ .at = at.weather + 2.3, .dur = 0.4, .to = .{ .text = "Weekend" }, .act = .click },
     // Settings: a theme, a toggle, Advanced, Save.
-    .{ .at = at.settings + 0.3, .dur = 0.5, .to = .{ .text = "Dark" }, .act = .click },
+    .{ .at = at.settings + 0.3, .dur = 0.5, .to = .other_theme, .act = .click },
     .{ .at = at.settings + 1.0, .dur = 0.4, .to = .{ .text = "Play sounds" }, .act = .click },
     .{ .at = at.settings + 1.6, .dur = 0.4, .to = .{ .text = "Advanced" }, .act = .click },
     .{ .at = at.settings + 2.1, .dur = 0.4, .to = .{ .text = "Save changes" }, .act = .save },
@@ -54,9 +65,10 @@ const moves = [_]Move{
 
 /// When the pointer shows.
 const shown = [_][2]f32{
-    .{ at.trade + 1.2, at.trade + 4.2 },  .{ at.chat + 1.7, at.chat + 3.0 },
-    .{ at.board + 0.2, at.board + 3.9 },  .{ at.music + 0.1, at.music + 3.0 },
-    .{ at.weather + 0.6, at.weather + 3.3 }, .{ at.settings + 0.1, at.settings + 3.2 },
+    .{ at.trade + 1.2, at.trade + 3.8 },     .{ at.chat + 1.7, at.chat + 3.0 },
+    .{ at.board + 0.2, at.board + 3.7 },     .{ at.music + 0.1, at.music + 3.0 },
+    .{ at.glass + 0.1, at.glass + 3.8 },     .{ at.weather + 0.6, at.weather + 3.2 },
+    .{ at.settings + 0.1, at.settings + 2.9 },
 };
 
 /// What happens without a click, and when.
@@ -103,7 +115,7 @@ fn cues(io: std.Io) !void {
     const o = &w.interface;
     for (moves) |m| if (m.act != .none) try o.print("click {d:.3}\n", .{m.at + m.dur});
     for ([_]f32{ at.chat + 1.2, at.chat + 3.7, at.settings + 2.5 }) |x| try o.print("chime {d:.3}\n", .{x});
-    for ([_]f32{ at.trade, at.chat, at.board, at.music, at.weather, at.settings, at.end }) |x| try o.print("cut {d:.3}\n", .{x});
+    for ([_]f32{ at.trade, at.chat, at.board, at.music, at.glass, at.weather, at.settings, at.end }) |x| try o.print("cut {d:.3}\n", .{x});
     try o.flush();
 }
 
@@ -134,7 +146,7 @@ const Script = struct {
             if (s.started != s.next) {
                 s.started = s.next;
                 s.start = d.cursor;
-                s.to = resolve(t, m.to) orelse d.cursor;
+                s.to = resolve(t, d, m.to) orelse d.cursor;
             }
             const p = clamp01((now - m.at) / m.dur);
             const e = p * p * (3 - 2 * p);
@@ -158,6 +170,7 @@ const Script = struct {
                         d.music.track = 1;
                         d.music.pos = 2;
                     },
+                    .morph => d.glass.open = !d.glass.open,
                     .save => d.toaster.push(.{ .status = .success, .title = "Settings saved", .message = "Synced to your 3 devices.", .duration = 0.6 }),
                     else => {},
                 }
@@ -173,8 +186,9 @@ fn clamp01(v: f32) f32 {
     return std.math.clamp(v, 0, 1);
 }
 
-fn resolve(t: *ui.Tester, to: Target) ?[2]f32 {
+fn resolve(t: *ui.Tester, d: *Director, to: Target) ?[2]f32 {
     switch (to) {
+        .other_theme => return resolve(t, d, .{ .text = if (d.dark) "Light" else "Dark" }),
         .point => |p| return p,
         .text => |s| {
             const r = t.findText(s) orelse {
