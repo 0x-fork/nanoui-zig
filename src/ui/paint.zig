@@ -12,7 +12,23 @@ const none = ctx_mod.none;
 
 pub fn paint(c: *Context, out: *std.ArrayList(metal.Instance)) void {
     out.clearRetainingCapacity();
+    c.layers.clearRetainingCapacity();
     paintNode(c, out, 0, types.Rect.infinite, 1, false, 0);
+    // Higher layers over the page, lowest first; within one, in tree order.
+    var done: usize = 0;
+    while (done < c.layers.items.len) {
+        // What waits, by layer; insertion sort keeps tree order among equals.
+        std.sort.insertion(u32, c.layers.items[done..], c, struct {
+            fn lt(ctx: *Context, a: u32, b: u32) bool {
+                return ctx.node(a).style.layer < ctx.node(b).style.layer;
+            }
+        }.lt);
+        const idx = c.layers.items[done];
+        done += 1;
+        c.layer_root = idx;
+        paintNode(c, out, idx, types.Rect.infinite, 1, false, 0);
+    }
+    c.layer_root = std.math.maxInt(u32);
 }
 
 fn snap(v: f32, scale: f32) f32 {
@@ -27,6 +43,11 @@ fn push(c: *Context, out: *std.ArrayList(metal.Instance), inst: metal.Instance) 
 fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip: types.Rect, opacity_in: f32, selectable_in: bool, scrolled: f32) void {
     const n = c.node(index).*;
     const st = n.style;
+    // A higher layer is drawn later, over the page.
+    if (st.layer > 0 and index != c.layer_root) {
+        c.layers.append(c.gpa, index) catch {};
+        return;
+    }
     const selectable = (selectable_in or st.selectable) and !st.control;
     const opacity = opacity_in * st.opacity;
     const r = n.rect;

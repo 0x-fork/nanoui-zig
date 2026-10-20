@@ -177,6 +177,15 @@ pub const Div = struct {
     pub fn offset(d: Div, x: f32, y: f32) Div {
         return d.set("offset", types.Point{ .x = x, .y = y });
     }
+    /// Placed from the window's top left (with `absolute`).
+    pub fn fixed(d: Div) Div {
+        _ = d.set("absolute", true);
+        return d.set("fixed", true);
+    }
+    /// Drawn above lower layers, unclipped by its parents (an overlay).
+    pub fn layer(d: Div, v: u8) Div {
+        return d.set("layer", v);
+    }
     pub fn scale(d: Div, v: f32) Div {
         return d.set("scale", v);
     }

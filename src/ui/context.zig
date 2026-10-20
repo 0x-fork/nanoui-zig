@@ -139,6 +139,10 @@ pub const Context = struct {
     motion: @import("motion/store.zig").Store = .{},
     /// The system asks for reduced motion: `ui.motion` moves at once.
     reduced_motion: bool = false,
+    /// Boxes of a higher layer met while painting, drawn after the page;
+    /// and the one being drawn so.
+    layers: std.ArrayList(u32) = .empty,
+    layer_root: u32 = std.math.maxInt(u32),
     scroll: std.AutoHashMapUnmanaged(u64, f32) = .empty,
     /// The textures this frame shows (`ui.texture`), by slot.
     textures: std.ArrayList(@import("gpu.zig").Texture) = .empty,
@@ -213,6 +217,7 @@ pub const Context = struct {
         c.hot_path.deinit(c.gpa);
         c.anims.deinit(c.gpa);
         c.motion.deinit(c.gpa);
+        c.layers.deinit(c.gpa);
         c.scroll.deinit(c.gpa);
         c.edits.deinit(c.gpa);
         c.scroll_max.deinit(c.gpa);
