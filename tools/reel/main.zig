@@ -1,5 +1,5 @@
-//! A 30-second reel of `ui.motion`, drawn by nanoui: the scenes
-//! (scenes.zig) run in a Tester, offscreen, 30 frames a second, and each
+//! A 30-second reel of `ui.motion` at work in nanotrade, a mock trading
+//! app drawn by nanoui (scenes.zig): it runs in a Tester, offscreen, 30 frames a second, and each
 //! frame's pixels go to standard output for ffmpeg. A script moves the
 //! pointer and clicks as a person would, through the Tester alone: no
 //! window shows and nothing reaches the screen or the mouse.
@@ -22,48 +22,80 @@ const at = scenes.at;
 const fps = 30;
 const scale = 1.5;
 
-const Target = union(enum) { point: [2]f32, text: []const u8 };
+const Target = union(enum) {
+    point: [2]f32,
+    text: []const u8,
+    /// Beside a text: the + of the shares' input, right of its value.
+    beside: struct { text: []const u8, dx: f32 },
+};
 
-const Move = struct { at: f32, dur: f32, to: Target, click: bool = false };
+const Act = enum { none, click, buy, place, dismiss };
+
+const Move = struct { at: f32, dur: f32, to: Target, act: Act = .none };
 
 const moves = [_]Move{
-    .{ .at = at.spring + 0.7, .dur = 0.7, .to = .{ .text = "Click me" }, .click = true },
-    .{ .at = at.spring + 1.75, .dur = 0.2, .to = .{ .point = .{ 640, 420 } }, .click = true },
-    .{ .at = at.spring + 2.75, .dur = 0.25, .to = .{ .point = .{ 640, 425 } }, .click = true },
-    .{ .at = at.spring + 4.0, .dur = 0.6, .to = .{ .point = .{ 1080, 640 } } },
-    .{ .at = at.presence + 1.8, .dur = 0.7, .to = .{ .text = "Delete project…" }, .click = true },
-    .{ .at = at.presence + 3.4, .dur = 0.6, .to = .{ .text = "Cancel" }, .click = true },
-    .{ .at = at.glass + 1.0, .dur = 0.6, .to = .{ .text = "Albums" }, .click = true },
-    .{ .at = at.glass + 2.0, .dur = 0.4, .to = .{ .text = "Search" }, .click = true },
-    .{ .at = at.glass + 3.0, .dur = 0.5, .to = .{ .text = "Tap" }, .click = true },
+    .{ .at = at.ranges + 0.3, .dur = 0.7, .to = .{ .text = "1W" }, .act = .click },
+    .{ .at = at.ranges + 1.9, .dur = 0.4, .to = .{ .text = "1M" }, .act = .click },
+    .{ .at = at.ranges + 3.1, .dur = 0.4, .to = .{ .text = "1Y" }, .act = .click },
+    // Across the chart, the crosshair following.
+    .{ .at = at.hover + 0.1, .dur = 0.8, .to = .{ .point = .{ 380, 360 } } },
+    .{ .at = at.hover + 1.0, .dur = 1.4, .to = .{ .point = .{ 640, 300 } } },
+    .{ .at = at.hover + 2.5, .dur = 1.2, .to = .{ .point = .{ 900, 250 } } },
+    .{ .at = at.hover + 3.8, .dur = 0.8, .to = .{ .point = .{ 1080, 220 } } },
+    .{ .at = at.order + 0.1, .dur = 0.6, .to = .{ .text = "Buy NVDA" }, .act = .buy },
+    .{ .at = at.order + 1.3, .dur = 0.6, .to = .{ .beside = .{ .text = "10", .dx = 53 } }, .act = .click },
+    .{ .at = at.order + 2.05, .dur = 0.15, .to = .{ .beside = .{ .text = "20", .dx = 53 } }, .act = .click },
+    .{ .at = at.order + 2.45, .dur = 0.15, .to = .{ .beside = .{ .text = "30", .dx = 53 } }, .act = .click },
+    .{ .at = at.order + 3.0, .dur = 0.5, .to = .{ .text = "Place order" }, .act = .place },
+    .{ .at = at.alert + 1.0, .dur = 0.5, .to = .{ .text = "Dismiss" }, .act = .dismiss },
 };
 
 /// When the pointer shows.
-const shown = [_][2]f32{ .{ at.spring + 0.4, at.spring + 4.7 }, .{ at.presence + 1.5, at.presence + 4.2 }, .{ at.glass + 0.7, at.glass + 4.0 } };
+const shown = [_][2]f32{ .{ at.ranges + 0.1, at.ranges + 3.9 }, .{ at.hover, at.hover + 4.9 }, .{ at.order, at.order + 4.0 }, .{ at.alert + 0.6, at.alert + 1.8 } };
 
-/// What the script changes without a click, and when.
+/// What happens without a click, and when.
 fn events(d: *Director, now: f32, prev: f32) void {
     const crossed = struct {
         fn f(p: f32, n: f32, t: f32) bool {
             return p < t and n >= t;
         }
     }.f;
-    if (crossed(prev, now, at.presence + 0.5)) d.toaster.push(.{ .status = .success, .title = "Saved", .message = "Your changes are in.", .duration = 2.2 });
-    if (crossed(prev, now, at.presence + 1.0)) d.toaster.push(.{ .status = .info, .title = "Synced", .message = "Up to date on every device.", .duration = 2.2 });
-    if (crossed(prev, now, at.presence + 1.5)) d.toaster.push(.{ .status = .warning, .title = "Low space", .message = "2 GB left on this disk.", .duration = 2.0 });
-    if (crossed(prev, now, at.layout + 2.0)) d.order = .{ 3, 0, 5, 1, 4, 2 };
-    if (crossed(prev, now, at.layout + 3.2)) d.order = .{ 5, 2, 0, 4, 3, 1 };
-    if (crossed(prev, now, at.loops + 0.4)) d.count = 12840;
+    // A tick every 0.35 s, leaning toward a path that crosses 186 just
+    // before the alert.
+    var t: f32 = at.ticks;
+    while (t < at.end) : (t += 0.35) if (crossed(prev, now, t)) {
+        const before = d.market.price;
+        const goal = 182.4 + (186.5 - 182.4) * std.math.clamp((t - at.ticks) / (at.alert - 0.3 - at.ticks), 0, 1);
+        d.market.tick((goal - d.market.price) * 0.25);
+        d.last_up = d.market.price >= before;
+        d.tick_at = now;
+    };
+    d.crosshair = now >= at.hover and now < at.hover + 5;
+    if (crossed(prev, now, at.order + 4.3)) {
+        d.placing = false;
+        d.filled = true;
+        d.entry = d.market.price - 0.4;
+        d.toaster.push(.{ .status = .success, .title = "Order filled", .message = "Bought 40 NVDA at market.", .duration = 3.0 });
+    }
+    if (crossed(prev, now, at.sort - 0.4)) d.order_open = false;
+    if (crossed(prev, now, at.sort + 0.4)) d.sorted = true;
+    if (crossed(prev, now, at.sort + 2.0)) {
+        d.market.watch[3].change = -0.92;
+        d.market.watch[4].change = 2.31;
+    }
+    if (crossed(prev, now, at.alert)) d.alert = true;
+    if (crossed(prev, now, at.end)) d.receding = true;
 }
 
-/// The times sounds go with: each click, and each cut to a scene.
+/// The times sounds go with: clicks, chimes for the fill and the alert,
+/// air as the window opens, the panel slides in and the end comes.
 fn cues(io: std.Io) !void {
     var buf: [4096]u8 = undefined;
     var w = std.Io.File.stdout().writer(io, &buf);
     const o = &w.interface;
-    for (moves) |m| if (m.click) try o.print("click {d:.3}\n", .{m.at + m.dur});
-    for ([_]f32{ at.presence + 0.5, at.presence + 1.0, at.presence + 1.5 }) |t| try o.print("chime {d:.3}\n", .{t});
-    for ([_]f32{ at.spring, at.presence, at.layout, at.glass, at.loops, at.code, at.end }) |cut| try o.print("cut {d:.3}\n", .{cut});
+    for (moves) |m| if (m.act != .none) try o.print("click {d:.3}\n", .{m.at + m.dur});
+    for ([_]f32{ at.order + 4.3, at.alert }) |t| try o.print("chime {d:.3}\n", .{t});
+    for ([_]f32{ 0.4, at.order + 0.7, at.end }) |t| try o.print("cut {d:.3}\n", .{t});
     try o.flush();
 }
 
@@ -72,7 +104,6 @@ const Script = struct {
     started: ?usize = null,
     start: [2]f32 = .{ 0, 0 },
     to: [2]f32 = .{ 0, 0 },
-    /// Frames left with the button down.
     held: u32 = 0,
     prev: f32 = -1,
 
@@ -88,7 +119,6 @@ const Script = struct {
         for (shown) |w| {
             const v = @min(clamp01((now - w[0]) / 0.3), clamp01((w[1] - now) / 0.3));
             d.cursor_alpha = @max(d.cursor_alpha, v);
-            if (now >= w[0] and now < w[0] + 0.5 / @as(f32, fps)) d.cursor = .{ 1080, 640 };
         }
         while (s.next < moves.len) {
             const m = moves[s.next];
@@ -102,14 +132,18 @@ const Script = struct {
             const e = p * p * (3 - 2 * p);
             d.cursor = .{ s.start[0] + (s.to[0] - s.start[0]) * e, s.start[1] + (s.to[1] - s.start[1]) * e };
             if (p < 1) break;
-            if (m.click) {
+            if (m.act != .none) {
                 t.ctx.input.mouse = .{ .x = d.cursor[0], .y = d.cursor[1] };
                 t.ctx.updateHot();
                 t.ctx.input.click_count = 1;
                 t.ctx.pointerDown();
-                // Held for a few frames, so the press shows.
                 s.held = 4;
-                if (m.to == .text and std.mem.eql(u8, m.to.text, "Delete project…")) d.dialog = true;
+                switch (m.act) {
+                    .buy => d.order_open = true,
+                    .place => d.placing = true,
+                    .dismiss => d.alert = false,
+                    else => {},
+                }
             }
             s.next += 1;
         }
@@ -131,6 +165,13 @@ fn resolve(t: *ui.Tester, to: Target) ?[2]f32 {
                 return null;
             };
             return .{ r.x + r.w / 2, r.y + r.h / 2 };
+        },
+        .beside => |b| {
+            const r = t.findText(b.text) orelse {
+                std.debug.print("reel: no \"{s}\" on screen\n", .{b.text});
+                return null;
+            };
+            return .{ r.x + r.w / 2 + b.dx, r.y + r.h / 2 };
         },
     }
 }
@@ -155,10 +196,10 @@ pub fn main(init: std.process.Init) !void {
         const secs = try std.fmt.parseFloat(f32, v[0..colon]);
         try stills.append(gpa, .{ .frame = @intFromFloat(@round(secs * fps)), .path = v[colon + 1 ..] });
     }
-    var d: Director = .{ .dark = dark, .toaster = .{ .gpa = gpa, .width = 380 } };
+    var d: Director = .{ .dark = dark, .market = .init(), .toaster = .{ .gpa = gpa, .width = 340, .corner = .top_right } };
     defer d.toaster.deinit();
     var t: ui.Tester = undefined;
-    try t.init(gpa, .init(&d, Director.view), .{ .width = scenes.width, .height = scenes.height, .scale = scale, .theme = @import("theme.zig").ui_(dark) });
+    try t.init(gpa, .init(&d, Director.draw), .{ .width = scenes.width, .height = scenes.height, .scale = scale, .theme = @import("theme.zig").ui_(dark) });
     defer t.deinit();
     t.dt = 1.0 / @as(f32, fps);
     t.time = 0;
