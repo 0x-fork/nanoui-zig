@@ -158,6 +158,11 @@ pub const Window = struct {
         gtk.api.gtk_widget_hide(win);
     }
 
+    /// Popovers are macOS's: none hides itself here.
+    pub fn justHidden(_: *Window) bool {
+        return false;
+    }
+
     pub fn isVisible(self: *Window) bool {
         const win = self.gtkwindow orelse return false;
         return gtk.api.gtk_widget_is_visible(win) != 0;

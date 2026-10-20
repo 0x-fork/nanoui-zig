@@ -221,8 +221,10 @@ pub const App = struct {
     }
 
     /// Adds an icon to the menu bar's status area; it lives until removed
-    /// with `Tray.destroy` or the app ends.
+    /// with `Tray.destroy` or the app ends. Not when the app runs hidden.
     pub fn newTray(self: *App, opts: tray_mod.Options) !*tray_mod.Tray {
+        // Headless runs (snapshots, scripts, tests) keep out of the menu bar.
+        if (self.flags.hidden) return error.Hidden;
         const t = try tray_mod.Tray.create(self.gpa, self.options.name, opts);
         errdefer t.destroy();
         try self.trays.append(self.gpa, t);

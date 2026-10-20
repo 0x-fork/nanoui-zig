@@ -27,6 +27,10 @@ pub const TitleBar = enum {
     default,
     /// Content under a transparent title bar; the traffic lights stay.
     hidden,
+    /// No frame at all: a panel with rounded corners and a shadow, above
+    /// other windows, that takes keys without bringing its app forward and
+    /// hides when it loses them (a menu bar extra's popover). macOS.
+    popover,
 };
 
 pub fn Callback(comptime Window: type) type {

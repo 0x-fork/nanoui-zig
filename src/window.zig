@@ -25,6 +25,8 @@ pub const Window = struct {
     title_bar: TitleBar = .default,
     on_close: ?Callback = null,
     closed: bool = false,
+    /// When a popover last hid itself, losing the keys.
+    resigned_at: f64 = 0,
 
     pub fn create(app: *App, options: Options) !*Window {
         const pool = objc.Pool.push();
@@ -32,11 +34,17 @@ pub const Window = struct {
         const self = try app.gpa.create(Window);
         errdefer app.gpa.destroy(self);
 
+        const popover = options.title_bar == .popover;
         var style: objc.NSUInteger = 1 | 2 | 4; // titled, closable, miniaturizable
         if (options.resizable) style |= 8;
         if (options.title_bar == .hidden) style |= 1 << 15; // full size content view
+        if (popover) style = 1 << 7; // borderless, non-activating panel
         const rect: objc.CGRect = .{ .size = .{ .width = options.width, .height = options.height } };
-        const nswindow = objc.msg(objc.Object, objc.alloc("NSWindow"), "initWithContentRect:styleMask:backing:defer:", .{
+        // A borderless panel takes keys only if its class says it can.
+        const window_class = if (popover) objc.defineClass(.{ .name = "NanoUIPopover", .superclass = "NSPanel", .methods = &.{
+            .{ .name = "canBecomeKeyWindow", .imp = &yes, .types = "B@:" },
+        } }) else objc.class("NSWindow");
+        const nswindow = objc.msg(objc.Object, objc.msg(objc.Object, window_class, "alloc", .{}), "initWithContentRect:styleMask:backing:defer:", .{
             rect, style, @as(objc.NSUInteger, 2), objc.NO,
         });
         objc.msg(void, nswindow, "setReleasedWhenClosed:", .{objc.NO});
@@ -53,6 +61,7 @@ pub const Window = struct {
             .methods = &.{
                 .{ .name = "windowWillClose:", .imp = &windowWillClose, .types = "v@:@" },
                 .{ .name = "windowDidChangeOcclusionState:", .imp = &occlusionChanged, .types = "v@:@" },
+                .{ .name = "windowDidResignKey:", .imp = &resignedKey, .types = "v@:@" },
             },
         });
         const delegate = objc.msg(objc.Object, delegate_class, "new", .{});
@@ -64,6 +73,21 @@ pub const Window = struct {
         switch (options.content) {
             .page => |p| self.page = try Page.create(self, p),
             .view => |v| self.surface = try Surface.create(self, v, options.theme),
+        }
+        if (popover) {
+            objc.msg(void, nswindow, "setOpaque:", .{objc.NO});
+            objc.msg(void, nswindow, "setBackgroundColor:", .{objc.msg(objc.Object, objc.class("NSColor"), "clearColor", .{})});
+            objc.msg(void, nswindow, "setHasShadow:", .{objc.YES});
+            objc.msg(void, nswindow, "setLevel:", .{@as(objc.NSInteger, 101)}); // NSPopUpMenuWindowLevel
+            objc.msg(void, nswindow, "setHidesOnDeactivate:", .{objc.NO});
+            // On every space, over full screen apps, out of Exposé.
+            objc.msg(void, nswindow, "setCollectionBehavior:", .{@as(objc.NSUInteger, (1 << 0) | (1 << 3) | (1 << 8))});
+            const content = objc.msg(objc.Object, nswindow, "contentView", .{});
+            objc.msg(void, content, "setWantsLayer:", .{objc.YES});
+            if (objc.msg(?objc.Object, content, "layer", .{})) |layer| {
+                objc.msg(void, layer, "setCornerRadius:", .{@as(f64, 12)});
+                objc.msg(void, layer, "setMasksToBounds:", .{objc.YES});
+            }
         }
 
         if (options.x != null and options.y != null) self.setPosition(options.x.?, options.y.?) else objc.msg(void, nswindow, "center", .{});
@@ -164,6 +188,12 @@ pub const Window = struct {
         objc.msg(void, self.nswindow, "orderOut:", .{@as(?objc.Object, null)});
     }
 
+    /// Whether a popover just hid itself (a click on what opens it, which
+    /// took its keys, should leave it closed, not open it again).
+    pub fn justHidden(self: *Window) bool {
+        return CACurrentMediaTime() - self.resigned_at < 0.3;
+    }
+
     pub fn isVisible(self: *Window) bool {
         return objc.msg(objc.BOOL, self.nswindow, "isVisible", .{});
     }
@@ -252,6 +282,19 @@ fn occlusionChanged(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv
     const w = objc.getZig(Window, self_obj) orelse return;
     if (w.surface) |s| s.occlusionChanged();
 }
+
+fn yes(_: objc.Object, _: objc.SEL) callconv(.c) bool {
+    return true;
+}
+
+fn resignedKey(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) void {
+    const w = objc.getZig(Window, self_obj) orelse return;
+    if (w.title_bar != .popover) return;
+    w.hide();
+    w.resigned_at = CACurrentMediaTime();
+}
+
+extern "c" fn CACurrentMediaTime() f64;
 
 fn windowWillClose(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) void {
     const w = objc.getZig(Window, self_obj) orelse return;
