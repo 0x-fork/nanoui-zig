@@ -12,7 +12,7 @@ const none = ctx_mod.none;
 
 pub fn paint(c: *Context, out: *std.ArrayList(metal.Instance)) void {
     out.clearRetainingCapacity();
-    paintNode(c, out, 0, types.Rect.infinite, 1, false);
+    paintNode(c, out, 0, types.Rect.infinite, 1, false, 0);
 }
 
 fn snap(v: f32, scale: f32) f32 {
@@ -23,7 +23,8 @@ fn push(c: *Context, out: *std.ArrayList(metal.Instance), inst: metal.Instance) 
     out.append(c.gpa, inst) catch {};
 }
 
-fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip: types.Rect, opacity_in: f32, selectable_in: bool) void {
+/// `scrolled`: how far the scrolling boxes it's in have scrolled it up.
+fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip: types.Rect, opacity_in: f32, selectable_in: bool, scrolled: f32) void {
     const n = c.node(index).*;
     const st = n.style;
     const selectable = (selectable_in or st.selectable) and !st.control;
@@ -31,6 +32,7 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
     const r = n.rect;
     const visible = r.intersect(clip);
     if (opacity <= 0.001) return;
+    const start = out.items.len;
     const clip4 = metal.clip4(clip);
     const rect4: [4]f32 = .{ r.x, r.y, r.w, r.h };
 
@@ -102,10 +104,41 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
     }
     const first = out.items.len;
     var child = n.first_child;
-    while (child != none) : (child = c.node(child).next) paintNode(c, out, child, child_clip, opacity, selectable);
+    const inner_scrolled = scrolled + if (st.scroll) c.scroll.get(n.id) orelse 0 else 0;
+    while (child != none) : (child = c.node(child).next) paintNode(c, out, child, child_clip, opacity, selectable, inner_scrolled);
     if ((st.clip or st.scroll) and st.radius > 0) roundClip(out.items[first..], r, visible, st.radius);
 
     if (st.scroll) paintScrollbar(c, out, n, visible, opacity);
+    if (st.scale != 1) scaleItems(out.items[start..], r.x + r.w / 2, r.y + r.h / 2, @max(st.scale, 0), clip4);
+    if (st.layout_motion != 0) {
+        // Where the layout put it, scrolling aside: a scroll isn't a move.
+        var placed = r;
+        placed.y += scrolled;
+        const d = @import("motion/layout.zig").shift(c, st.layout_motion, placed);
+        if (d[0] != 0 or d[1] != 0) for (out.items[start..]) |*it| {
+            it.rect[0] += d[0];
+            it.rect[1] += d[1];
+            if (!std.mem.eql(f32, &it.clip, &clip4) and it.clip[0] > -1e5) it.clip = .{ it.clip[0] + d[0], it.clip[1] + d[1], it.clip[2] + d[0], it.clip[3] + d[1] };
+        };
+    }
+}
+
+/// Scales what a box drew about (cx, cy): rectangles, corners, borders,
+/// shadows' blur, and the clips its own boxes made; not the clip it's
+/// drawn in (`outer`), which stays as its parent set it.
+fn scaleItems(items: []metal.Instance, cx: f32, cy: f32, k: f32, outer: [4]f32) void {
+    for (items) |*it| {
+        it.rect = .{ cx + (it.rect[0] - cx) * k, cy + (it.rect[1] - cy) * k, it.rect[2] * k, it.rect[3] * k };
+        it.radius *= k;
+        // A quad's border, a shadow's blur, glass's blur; a texture keeps
+        // its slot there.
+        if (it.kind == metal.Kind.quad or it.kind == metal.Kind.shadow or it.kind == metal.Kind.glass) it.border_width *= k;
+        if (!std.mem.eql(f32, &it.clip, &outer) and it.clip[0] > -1e5) {
+            it.clip = .{ cx + (it.clip[0] - cx) * k, cy + (it.clip[1] - cy) * k, cx + (it.clip[2] - cx) * k, cy + (it.clip[3] - cy) * k };
+            const round = metal.clipCorners(it.clip_round);
+            it.clip_round = metal.clipRound(round.radius * k, round.corners);
+        }
+    }
 }
 
 fn paintText(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, n: ctx_mod.Node, t: ctx_mod.Content.Text, clip4: [4]f32, opacity: f32, selectable: bool) void {

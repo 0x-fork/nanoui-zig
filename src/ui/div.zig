@@ -177,6 +177,17 @@ pub const Div = struct {
     pub fn offset(d: Div, x: f32, y: f32) Div {
         return d.set("offset", types.Point{ .x = x, .y = y });
     }
+    pub fn scale(d: Div, v: f32) Div {
+        return d.set("scale", v);
+    }
+    /// Takes a `ui.motion` frame: its offset, scale and opacity, and the
+    /// size, radius and background it animates. Last, so what it animates
+    /// wins over what was set before.
+    pub fn motion(d: Div, f: @import("motion/motion.zig").Frame) Div {
+        f.apply(d.style());
+        if (f.gestures) d.c.node(d.index).interactive = true;
+        return d;
+    }
 
     // Interaction.
 

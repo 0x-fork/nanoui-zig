@@ -82,6 +82,8 @@ pub const textField = textfield.textField;
 pub const TextFieldOptions = textfield.Options;
 pub const TextBuffer = textfield.TextBuffer;
 pub const TextFieldResult = textfield.Result;
+/// Declarative, interruptible animation (springs, tweens, presence).
+pub const motion = @import("motion/motion.zig");
 pub const div = @import("div.zig").div;
 pub const Div = @import("div.zig").Div;
 pub const list = @import("list.zig").list;
@@ -117,6 +119,8 @@ test {
     _ = @import("tests_keymap.zig");
     _ = @import("tests_multiline.zig");
     _ = @import("tests_texture.zig");
+    _ = @import("tests_motion.zig");
+    _ = @import("motion/motion.zig");
     _ = @import("keymap.zig");
     _ = @import("undo.zig");
     _ = @import("tests_cursor.zig");

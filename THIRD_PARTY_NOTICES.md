@@ -34,6 +34,19 @@ Zed, Copyright 2022–2025 Zed Industries, Inc.:
 GPUI is licensed under the Apache License 2.0, whose text is kept verbatim in
 [`third_party/licenses/GPUI-Apache-2.0.txt`](third_party/licenses/GPUI-Apache-2.0.txt).
 
+## gpui-motion
+
+`ui.motion` (`src/ui/motion/`) follows
+[gpui-motion](https://github.com/1bye/gpui-motion), Copyright (c) 2026 1keep
+contributors, as of
+[`fd9baf9`](https://github.com/1bye/gpui-motion/tree/fd9baf910ba0e88b06967bfb322d6be4b2d39723). That covers its
+model (targets set every frame, interruptible transitions, presence with
+exits, keyframes, stagger, layout animation), the exact spring solution and
+its visual timing, and the easing curves with their derivatives.
+gpui-motion is dual licensed under MIT or Apache 2.0. nanoui takes it under
+MIT, whose text is kept verbatim in
+[`third_party/licenses/gpui-motion-MIT.txt`](third_party/licenses/gpui-motion-MIT.txt).
+
 ## Apps
 
 [nanoterm](https://github.com/justrach/nanoterm) and

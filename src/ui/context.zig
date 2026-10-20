@@ -135,6 +135,10 @@ pub const Context = struct {
     hits: std.ArrayList(Hit) = .empty,
     next_hits: std.ArrayList(Hit) = .empty,
     anims: std.AutoHashMapUnmanaged(u64, Anim) = .empty,
+    /// What `ui.motion` remembers of each animated box.
+    motion: @import("motion/store.zig").Store = .{},
+    /// The system asks for reduced motion: `ui.motion` moves at once.
+    reduced_motion: bool = false,
     scroll: std.AutoHashMapUnmanaged(u64, f32) = .empty,
     /// The textures this frame shows (`ui.texture`), by slot.
     textures: std.ArrayList(@import("gpu.zig").Texture) = .empty,
@@ -208,6 +212,7 @@ pub const Context = struct {
         c.next_hits.deinit(c.gpa);
         c.hot_path.deinit(c.gpa);
         c.anims.deinit(c.gpa);
+        c.motion.deinit(c.gpa);
         c.scroll.deinit(c.gpa);
         c.edits.deinit(c.gpa);
         c.scroll_max.deinit(c.gpa);
@@ -279,6 +284,7 @@ pub const Context = struct {
                 }
             }
             for (stale[0..n]) |k| _ = c.anims.remove(k);
+            c.motion.forget(c.frame, 120);
         }
     }
 

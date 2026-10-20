@@ -158,6 +158,49 @@ and a test checks the two renderers agree.
   <br><sub>The gallery's Glass page.</sub>
 </p>
 
+### Motion
+
+`ui.motion` animates boxes the way gpui-motion does: every frame, you say
+where a box should be, and motion takes it there.
+
+- **Transitions:** a spring, or a tween with an easing.
+- **Interruptible:** a target that changes midway is taken from where the box
+  is, and a spring keeps its speed.
+- **Presence:** boxes enter from `initial`, and leave to `exit` before
+  they're removed.
+- **Gestures:** `hover` and `press` are targets too.
+- **Lists:** items can be staggered.
+- **Layout animation:** boxes the layout moves glide to their new place.
+- **Keyframes:** they loop, or play there and back.
+
+Motion keeps its state in the frame's context, by box, so there are no
+objects to hold. It draws frames only while something moves, and jumps
+straight to the end when the system asks for reduced motion.
+
+```zig
+const f = ui.motion.frame(c, .{
+    .target = .{ .width = if (open) 320 else 180, .background = if (open) th.accent else th.surface },
+    .initial = .{ .y = 12, .opacity = 0 },
+    .press = .{ .scale = 0.96 },
+    .transition = .{ .spring = ui.motion.Spring.bouncy },
+});
+const card = ui.div(c).p(16).control().motion(f);
+defer card.end();
+if (card.clicked()) open = !open;
+
+// A toast that comes and goes: drawn while it shows, and while it leaves.
+if (ui.motion.present(c, "toast", saved, .{ .initial = .{ .y = 24, .opacity = 0 }, .exit = .{ .opacity = 0 } })) |t| {
+    const toast = ui.div(c).px(16).py(12).rounded(12).bg(th.text).motion(t);
+    defer toast.end();
+    ui.text(c, "Saved", .{ .color = th.background });
+}
+```
+
+<p align="center">
+  <img src="docs/images/gallery-motion.png" alt="The gallery's Motion page: a card, a counter, a staggered list, easings, and a toast" width="640">
+  <br><sub>The gallery's Motion page.</sub>
+</p>
+
 ## Web pages
 
 ```zig
@@ -298,13 +341,13 @@ plugins yet. Apps update themselves from GitHub releases on macOS
 
 ## License
 
-nanoui is licensed under the [MIT License](LICENSE). Material from mygo (MIT)
-and GPUI (Apache 2.0) keeps its own notices; see
+nanoui is licensed under the [MIT License](LICENSE). Material from mygo (MIT),
+GPUI (Apache 2.0) and gpui-motion (MIT) keeps its own notices; see
 [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Credits
 
-nanoui stands on the shoulders of two projects:
+nanoui stands on the shoulders of these projects:
 
 - **[mygo](https://github.com/egoist/mygo)** by [egoist](https://github.com/egoist):
   nanoui began as a port of its core to Zig, and keeps its architecture. That
@@ -323,5 +366,9 @@ nanoui stands on the shoulders of two projects:
   - layouts cached across frames, with glyphs rasterized once into an atlas;
   - Gaussian shadows;
   - its general idea of a fast, GPU-drawn native UI.
+- **[gpui-motion](https://github.com/1bye/gpui-motion)** by
+  [1keep](https://github.com/1bye): `ui.motion` follows its model and API.
+  That covers interruptible targets, presence, keyframes, stagger, layout
+  animation, its exact springs and its easing curves.
 
 <p align="center"><sub>Built in Zig 0.17 · <a href="AGENTS.md">AGENTS.md</a> · <a href="hillclimb/README.md">benchmarks</a> · <a href="LICENSE">MIT</a> · <a href="THIRD_PARTY_NOTICES.md">third-party notices</a></sub></p>

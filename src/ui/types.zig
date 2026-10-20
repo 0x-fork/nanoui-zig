@@ -160,6 +160,11 @@ pub const Style = struct {
     opacity: f32 = 1,
     /// Moves the box after layout, without moving its siblings.
     offset: Point = .{},
+    /// Draws the box and its content larger or smaller about its center,
+    /// after layout (its siblings, and where it takes clicks, stay put).
+    scale: f32 = 1,
+    /// Glides when the layout moves it (`ui.motion`'s `layout`): its id.
+    layout_motion: u64 = 0,
     /// Out of the flow: placed at its parent's content origin (plus
     /// `offset`), at its own size, over or under its siblings.
     absolute: bool = false,
