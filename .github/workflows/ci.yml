@@ -24,6 +24,13 @@ jobs:
       - run: zig build test
       - run: zig build test -Dportable=true
       - run: zig build -Dtarget=x86_64-windows-gnu --prefix zig-out/windows
+      - run: zig build test-nui
+      - name: nui makes an app that builds, passes its test and renders
+        run: |
+          zig build nui
+          nui="$PWD/zig-out/bin/nui"
+          "$nui" start ci-app --dir "$RUNNER_TEMP/ci-app" --local "$PWD"
+          cd "$RUNNER_TEMP/ci-app" && "$nui" test && "$nui" snapshot --out shot.png --script "click:Increment" --json
 
   linux:
     runs-on: ubuntu-24.04
@@ -38,6 +45,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends libgtk-3-0t64 fonts-dejavu-core fonts-noto-core xvfb xauth zsh
       - run: zig build test-bin --prefix zig-out/linux
       - run: xvfb-run -a zig-out/linux/bin/nanoui-tests
+      - run: zig build test-nui
+      - name: nui makes an app that builds, passes its test and renders
+        run: |
+          zig build nui
+          nui="$PWD/zig-out/bin/nui"
+          "$nui" doctor
+          "$nui" start ci-app --dir "$RUNNER_TEMP/ci-app" --local "$PWD"
+          cd "$RUNNER_TEMP/ci-app" && xvfb-run -a "$nui" test && xvfb-run -a "$nui" snapshot --out shot.png --script "click:Increment" --json
 
   windows:
     runs-on: windows-2025
@@ -49,3 +64,16 @@ jobs:
       # Tests write their pictures to /tmp: on Windows, \tmp on this drive.
       - run: New-Item -ItemType Directory -Force -Path \tmp | Out-Null
       - run: zig build test
+      - run: zig build test-nui
+      - name: nui makes an app that builds, passes its test and renders
+        run: |
+          zig build nui
+          if ($LASTEXITCODE) { throw "nui didn't build" }
+          $nui = "$PWD\zig-out\bin\nui.exe"
+          & $nui start ci-app --dir "$env:RUNNER_TEMP\ci-app" --local "$PWD"
+          if ($LASTEXITCODE) { throw "nui start failed" }
+          Set-Location "$env:RUNNER_TEMP\ci-app"
+          & $nui test
+          if ($LASTEXITCODE) { throw "nui test failed" }
+          & $nui snapshot --out shot.png --script "click:Increment" --json
+          if ($LASTEXITCODE) { throw "nui snapshot failed" }

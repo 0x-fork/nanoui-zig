@@ -34,6 +34,20 @@ pub fn build(b: *std.Build) void {
     }
     // Elsewhere GTK is loaded when the app starts (dlopen): nothing to link.
 
+    // nui: the command that makes and checks apps (tools/nui).
+    const nui_options = b.addOptions();
+    nui_options.addOption([]const u8, "version", @import("build.zig.zon").version);
+    const nui = b.addExecutable(.{ .name = "nui", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/nui/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "build_options", .module = nui_options.createModule() }},
+    }) });
+    b.installArtifact(nui);
+    b.step("nui", "Build zig-out/bin/nui").dependOn(&b.addInstallArtifact(nui, .{}).step);
+    const nui_tests = b.addTest(.{ .root_module = nui.root_module });
+    b.step("test-nui", "Test nui").dependOn(&b.addRunArtifact(nui_tests).step);
+
     for (examples) |name| {
         // Pages (the hello example) need a webview: macOS for now.
         if (os != .macos and std.mem.eql(u8, name, "hello")) continue;

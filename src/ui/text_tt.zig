@@ -216,8 +216,11 @@ pub const TextSystem = struct {
         var prev: ?struct { id: u16, g: u16 } = null;
         var i: usize = 0;
         while (i < s.len) {
-            const n = @min(utf8.seqLen(s[i]), s.len - i);
-            const cp: u21 = std.unicode.utf8Decode(s[i .. i + n]) catch 0xfffd;
+            // A character cut off at the end (a span ending inside it) is
+            // the replacement character, not a decode of too few bytes.
+            const want = utf8.seqLen(s[i]);
+            const n = @min(want, s.len - i);
+            const cp: u21 = if (n == want) std.unicode.utf8Decode(s[i .. i + n]) catch 0xfffd else 0xfffd;
             var id = f.id;
             var rf = primary;
             var g = rf.font.glyphIndex(if (cp == '\t') ' ' else cp);
@@ -330,4 +333,12 @@ fn breakLines(gpa: std.mem.Allocator, lines: *std.ArrayList(Line), s: []const u8
         start = next_start;
         if (start == s.len and end < s.len and s[end] == '\n') try lines.append(gpa, .{ .start = s.len, .end = s.len, .width = 0 });
     }
+}
+
+test "a character cut off at a string's end is shaped, not decoded short" {
+    var ts = TextSystem.init(std.testing.allocator);
+    defer ts.deinit();
+    // "a→" with the arrow's last byte gone, as a span can end.
+    const w = ts.width("a\xe2\x86", .{ .size = 13 });
+    try std.testing.expect(w > 0);
 }
