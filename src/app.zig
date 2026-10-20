@@ -200,6 +200,11 @@ pub const App = struct {
         std.log.info("nanoui: wrote {s}/nanoui.js and nanoui.d.ts", .{dir_path});
     }
 
+    /// From any thread: calls `func(ctx)` on the main thread soon.
+    pub fn onMain(ctx: ?*anyopaque, func: *const fn (?*anyopaque) callconv(.c) void) void {
+        objc.dispatchMain(ctx, func);
+    }
+
     /// Calls `func(ctx)` on the main thread after `ms` milliseconds.
     pub fn after(ms: u64, ctx: ?*anyopaque, func: *const fn (?*anyopaque) callconv(.c) void) void {
         objc.dispatchAfter(ms * std.time.ns_per_ms, ctx, func);

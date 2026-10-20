@@ -97,6 +97,12 @@ pub const App = struct {
         if (self.running) gtk.api.gtk_main_quit();
     }
 
+    /// From any thread: calls `func(ctx)` on the main thread soon (GLib's
+    /// main context takes sources from any thread).
+    pub fn onMain(ctx: ?*anyopaque, func: *const fn (?*anyopaque) callconv(.c) void) void {
+        after(0, ctx, func);
+    }
+
     /// Calls `func(ctx)` on the main thread after `ms` milliseconds.
     pub fn after(ms: u64, ctx: ?*anyopaque, func: *const fn (?*anyopaque) callconv(.c) void) void {
         const Timer = struct {

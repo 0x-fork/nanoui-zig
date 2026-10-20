@@ -25,6 +25,7 @@ extern "kernel32" fn CloseHandle(h: HANDLE) callconv(.winapi) w.BOOL;
 
 const WM_BYTES = 0x8000 + 0x4e1; // WM_APP + …
 const WM_DONE = WM_BYTES + 1;
+const WM_CALL = WM_BYTES + 2;
 const HWND_MESSAGE: isize = -3;
 const timeout: u32 = 0x102;
 
@@ -97,9 +98,25 @@ fn proc_(h: w.HWND, msg: u32, wp: w.WPARAM, lp: w.LPARAM) callconv(.winapi) w.LR
             if (!s.canceled.load(.acquire)) s.done(s.ctx);
             s.release();
         },
+        WM_CALL => {
+            const func: Handler = @ptrFromInt(wp);
+            func(@ptrFromInt(@as(usize, @bitCast(lp))));
+        },
         else => return w.DefWindowProcW(h, msg, wp, lp),
     }
     return 0;
+}
+
+/// Makes the message window; on the main thread, before `post` is used.
+pub fn prepare() !void {
+    try window();
+}
+
+/// From any thread: `func(ctx)` runs on the main thread soon. False if
+/// the window isn't made yet (`prepare`) or the post failed.
+pub fn post(ctx: ?*anyopaque, func: Handler) bool {
+    const h = hwnd orelse return false;
+    return w.PostMessageW(h, WM_CALL, @intFromPtr(func), @bitCast(@intFromPtr(ctx))) != 0;
 }
 
 /// The message-only window, made on the main thread the first time.

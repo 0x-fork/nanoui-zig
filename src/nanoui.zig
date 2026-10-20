@@ -94,6 +94,7 @@ test {
     std.testing.refAllDecls(kit);
     _ = @import("menu_types.zig");
     _ = @import("update.zig");
+    _ = @import("update_portable.zig");
     if (!mac) {
         inline for (.{ plat.app, plat.window, plat.menu, plat.dialog, plat.desktop, plat.fdwatch, }) |m| std.testing.refAllDecls(m);
         return;
