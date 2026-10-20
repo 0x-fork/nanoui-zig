@@ -146,11 +146,23 @@ pub fn swap(gpa: std.mem.Allocator, io: std.Io, staged: []const u8, exe: []const
     if (!windows) return std.Io.Dir.renameAbsolute(fresh, exe, io);
     const old = try std.fmt.allocPrint(gpa, "{s}.old-{d}", .{ exe, n });
     defer gpa.free(old);
-    try std.Io.Dir.renameAbsolute(exe, old, io);
-    std.Io.Dir.renameAbsolute(fresh, exe, io) catch |e| {
-        std.Io.Dir.renameAbsolute(old, exe, io) catch {};
+    try move(gpa, exe, old);
+    move(gpa, fresh, exe) catch |e| {
+        move(gpa, old, exe) catch {};
         return e;
     };
+}
+
+extern "kernel32" fn MoveFileExW(from: [*:0]const u16, to: [*:0]const u16, flags: u32) callconv(.winapi) i32;
+
+/// A rename as Windows lets a running program be renamed (std's rename
+/// asks for access the loader's open file refuses).
+fn move(gpa: std.mem.Allocator, from: []const u8, to: []const u8) !void {
+    const f = try std.unicode.utf8ToUtf16LeAllocZ(gpa, from);
+    defer gpa.free(f);
+    const t = try std.unicode.utf8ToUtf16LeAllocZ(gpa, to);
+    defer gpa.free(t);
+    if (MoveFileExW(f, t, 1) == 0) return error.FileBusy; // MOVEFILE_REPLACE_EXISTING
 }
 
 /// Starts the installed program, on its own; the caller then quits.
