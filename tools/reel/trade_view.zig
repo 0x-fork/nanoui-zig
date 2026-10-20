@@ -1,5 +1,4 @@
-//! nanotrade's window, a mock trading app nanoui draws for the reel: a
-//! title bar, the watchlist down the side (rows that glide when a re-sort
+//! nanotrade, a mock trading app nanoui draws for the reel: the watchlist down the side (rows that glide when a re-sort
 //! moves them, prices that ease to each tick), NVDA's header (its price
 //! easing and flashing on each tick, a live dot breathing), the range tabs
 //! whose marker slides, the chart, and the order panel that slides in,
@@ -14,39 +13,20 @@ const chart = @import("trade_chart.zig");
 const scenes = @import("scenes.zig");
 const Director = scenes.Director;
 
-pub const win: ui.Rect = .{ .x = 40, .y = 34, .w = 1200, .h = 652 };
 const side_w: f32 = 250;
 const panel_w: f32 = 300;
 
-pub fn window(c: *ui.Context, d: *Director) void {
+/// nanotrade's content in a `w` × `h` box (under the window's title bar).
+pub fn content(c: *ui.Context, d: *Director, w: f32, h: f32) void {
     const th = c.theme;
     const up = th.success;
     const down = th.danger;
-    // The window springs in, and steps back for the end card.
-    const f = motion.frame(c, .{
-        .target = if (d.receding) .{ .scale = 0.92, .opacity = 0.35, .y = -10 } else .{},
-        .initial = .{ .scale = 0.94, .y = 30, .opacity = 0 },
-        .transition = .{ .spring = .{ .stiffness = 150, .damping = 20 } },
-    });
-    const w = ui.div(c).absolute().offset(win.x, win.y).w(win.w).h(win.h).column().rounded(14).bg(th.background).border(th.border).shadow(.{ .color = th.shadow.alpha(1), .blur = 50, .y = 20 }).clip().motion(f);
-    defer w.end();
-    titlebar(c);
-    const body = ui.div(c).row().wFull().grow();
+    const body = ui.div(c).row().w(w).h(h);
     defer body.end();
     sidebar(c, d, up, down);
     _ = c.leaf(.{ .width = .{ .px = 1 }, .height = .fill, .background = th.border }, .none, null);
-    main(c, d, up, down);
-    order(c, d);
-}
-
-fn titlebar(c: *ui.Context) void {
-    const th = c.theme;
-    const bar = ui.div(c).row().wFull().h(44).px(16).gap(8).itemsCenter().bg(th.surface_hover.alpha(0.6)).border(th.border.alpha(0.6));
-    defer bar.end();
-    for ([_]u24{ 0xff5f57, 0xfebc2e, 0x28c840 }) |col| _ = c.leaf(.{ .width = .{ .px = 12 }, .height = .{ .px = 12 }, .radius = 6, .background = .hex(col) }, .none, null);
-    const t = ui.div(c).grow().center();
-    defer t.end();
-    ui.text(c, "nanotrade", .{ .size = 13, .weight = .semibold, .color = th.muted });
+    main(c, d, up, down, w, h);
+    order(c, d, w);
 }
 
 fn sidebar(c: *ui.Context, d: *Director, up: ui.Color, down: ui.Color) void {
@@ -82,7 +62,7 @@ fn sidebar(c: *ui.Context, d: *Director, up: ui.Color, down: ui.Color) void {
     }
 }
 
-fn main(c: *ui.Context, d: *Director, up: ui.Color, down: ui.Color) void {
+fn main(c: *ui.Context, d: *Director, up: ui.Color, down: ui.Color, w: f32, h: f32) void {
     const th = c.theme;
     const m = ui.div(c).column().grow().hFull().px(24).pt(18).gap(14);
     defer m.end();
@@ -126,14 +106,14 @@ fn main(c: *ui.Context, d: *Director, up: ui.Color, down: ui.Color) void {
         gap.end();
         _ = kit.button(c, "Buy NVDA", .{ .variant = .primary, .icon = "plus", .size = .md });
     }
-    chart.draw(c, .{ .market = &d.market, .range = d.range, .hover = d.crosshair, .up = up, .down = down }, win.w - side_w - 49, win.h - 44 - 128);
+    chart.draw(c, .{ .market = &d.market, .range = d.range, .hover = d.crosshair, .up = up, .down = down }, w - side_w - 49, h - 128);
 }
 
 /// The order panel: it slides in from the right while open.
-fn order(c: *ui.Context, d: *Director) void {
+fn order(c: *ui.Context, d: *Director, w: f32) void {
     const th = c.theme;
     const f = motion.present(c, "order", d.order_open, .{ .initial = .{ .x = panel_w + 20, .opacity = 0.6 }, .exit = .{ .x = panel_w + 20 }, .transition = .{ .spring = .{ .stiffness = 260, .damping = 28 } } }) orelse return;
-    const p = ui.div(c).absolute().offset(win.w - panel_w - 14, 58).w(panel_w).column().gap(14).p(18).rounded(14).bg(th.surface).border(th.border).shadow(.{ .color = th.shadow.alpha(1), .blur = 30, .y = 10 }).motion(f);
+    const p = ui.div(c).absolute().offset(w - panel_w - 14, 14).w(panel_w).column().gap(14).p(18).rounded(14).bg(th.surface).border(th.border).shadow(.{ .color = th.shadow.alpha(1), .blur = 30, .y = 10 }).motion(f);
     defer p.end();
     {
         const h = ui.div(c).row().wFull().itemsCenter();
