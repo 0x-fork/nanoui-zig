@@ -9,6 +9,7 @@ const ui = nanoui.ui;
 const kit = nanoui.kit;
 const motion = ui.motion;
 const more = @import("scenes_more.zig");
+const palette = @import("theme.zig");
 
 /// Points; drawn at 1.5× for 1920 × 1080.
 pub const width = 1280;
@@ -162,13 +163,13 @@ fn layout(c: *ui.Context, d: *Director) void {
     const box = ui.div(c).absolute().offset(400, 250).w(480).column().gap(10);
     defer box.end();
     const names = [_][]const u8{ "Springs keep their speed", "Tweens ease from where they are", "Presence waits for exits", "Layout glides to the new place", "Keyframes loop and yoyo", "Numbers count up" };
-    const hues = [_]u24{ 0xe8453c, 0xf2a93b, 0x3fae5a, 0x2f6fd0, 0x8e44ad, 0x16a3a3 };
+    const hues = palette.hues(d.dark);
     for (d.order, 0..) |n, i| {
         ui.key(c, c.print("row-{d}", .{n}));
         const f = motion.frame(c, .{ .initial = .{ .x = -40, .opacity = 0 }, .delay = 0.3 + motion.stagger(i, 0.08), .layout = true, .transition = .{ .spring = .{ .stiffness = 260, .damping = 24 } } });
         const row = ui.div(c).row().wFull().h(56).px(20).gap(14).itemsCenter().rounded(14).bg(th.surface).border(th.border).shadow(.{ .color = th.shadow.alpha(0.4), .blur = 8, .y = 3 }).motion(f);
         defer row.end();
-        _ = c.leaf(.{ .width = .{ .px = 12 }, .height = .{ .px = 12 }, .radius = 6, .background = .hex(hues[n]) }, .none, null);
+        _ = c.leaf(.{ .width = .{ .px = 12 }, .height = .{ .px = 12 }, .radius = 6, .background = hues[n] }, .none, null);
         ui.text(c, names[n], .{ .size = 18, .weight = .medium });
     }
 }

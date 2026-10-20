@@ -158,7 +158,7 @@ pub fn main(init: std.process.Init) !void {
     var d: Director = .{ .dark = dark, .toaster = .{ .gpa = gpa, .width = 380 } };
     defer d.toaster.deinit();
     var t: ui.Tester = undefined;
-    try t.init(gpa, .init(&d, Director.view), .{ .width = scenes.width, .height = scenes.height, .scale = scale, .theme = if (dark) ui.Theme.dark_theme else ui.Theme.light });
+    try t.init(gpa, .init(&d, Director.view), .{ .width = scenes.width, .height = scenes.height, .scale = scale, .theme = @import("theme.zig").ui_(dark) });
     defer t.deinit();
     t.dt = 1.0 / @as(f32, fps);
     t.time = 0;

@@ -8,20 +8,21 @@ const motion = ui.motion;
 const scenes = @import("scenes.zig");
 const Director = scenes.Director;
 const caption = scenes.caption;
+const palette = @import("theme.zig");
 
 pub fn glass(c: *ui.Context, d: *Director) void {
     const th = c.theme;
     // Cards drifting up under the glass, all scene long.
     const t = d.now - scenes.at.glass;
     const drift = 40 - t * 60;
-    const hues = [_]u24{ 0xe8453c, 0xf2a93b, 0x3fae5a, 0x2f6fd0, 0x8e44ad, 0x16a3a3 };
+    const hues = palette.hues(d.dark);
     const labels = [_][]const u8{ "Photos", "Albums", "Search" };
     {
         const area = ui.div(c).absolute().offset(150, 0).w(980).h(scenes.height).clip();
         defer area.end();
         for (0..14) |i| {
             const y = drift + @as(f32, @floatFromInt(i)) * 92 + 120;
-            const card = ui.div(c).absolute().offset(0, y).w(980).h(76).row().px(26).gap(14).itemsCenter().rounded(20).bg(.hex(hues[(i + d.tab * 2) % hues.len]));
+            const card = ui.div(c).absolute().offset(0, y).w(980).h(76).row().px(26).gap(14).itemsCenter().rounded(20).bg(hues[(i + d.tab * 2) % hues.len]);
             defer card.end();
             ui.icon(c, "photo", .{ .size = 22, .color = .white });
             ui.text(c, c.print("{s} under the glass · {d}", .{ labels[d.tab], i + 1 }), .{ .size = 20, .weight = .semibold, .color = .white });
@@ -107,7 +108,7 @@ pub fn code(c: *ui.Context, d: *Director) void {
     const th = c.theme;
     caption(c, "zig", "A target, every frame", "No objects to keep. State lives by box, frames only while something moves.");
     {
-        const card = ui.div(c).absolute().offset(72, 270).w(640).column().p(28).gap(4).rounded(20).bg(if (d.dark) th.surface else .hex(0x1d1b16));
+        const card = ui.div(c).absolute().offset(72, 270).w(640).column().p(28).gap(4).rounded(20).bg(if (d.dark) th.surface else .hex(0x16140f));
         defer card.end();
         var lines = std.mem.splitScalar(u8, snippet, '\n');
         var i: usize = 0;
