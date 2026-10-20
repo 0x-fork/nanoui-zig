@@ -32,7 +32,7 @@ pub fn detect(u: *Updater, env: *const std.process.Environ.Map) !void {
     clearAside(u, exe);
     u.bundle = try u.gpa.dupe(u8, exe);
     u.current = try u.gpa.dupe(u8, u.options.version);
-    u.cache = try @import("nanoui.zig").desktop.path(u.gpa, .cache, u.options.name);
+    u.cache = try @import("nanoui.zig").path(u.gpa, .cache, u.options.name);
     u.feed = if (env.get("NANOUI_UPDATE_FEED")) |f|
         try u.gpa.dupe(u8, std.mem.trimEnd(u8, f, "/"))
     else
@@ -167,6 +167,14 @@ fn run(a: std.mem.Allocator, io: std.Io, argv: []const []const u8) ![]const u8 {
     const r = try std.process.run(a, io, .{ .argv = argv, .stdout_limit = .limited(1 << 20), .stderr_limit = .limited(1 << 20) });
     if (!r.term.success()) return error.CommandFailed;
     return r.stdout;
+}
+
+test "every part builds here" {
+    std.testing.refAllDecls(@This());
+    _ = &Updater.start;
+    _ = &Updater.deinit;
+    _ = &Updater.restart;
+    _ = &Updater.checkNow;
 }
 
 test "a staged program takes the running one's place, nothing left beside it" {
