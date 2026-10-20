@@ -112,6 +112,8 @@ pub const FrameStats = struct {
     instances: usize = 0,
 };
 const Anim = struct { value: f32, frame: u64 };
+/// A widget's own state (`Context.state`): a few bytes, kept while it's drawn.
+const Memory = struct { bytes: [48]u8 align(16), frame: u64 };
 
 pub const Context = struct {
     gpa: std.mem.Allocator,
@@ -135,6 +137,8 @@ pub const Context = struct {
     hits: std.ArrayList(Hit) = .empty,
     next_hits: std.ArrayList(Hit) = .empty,
     anims: std.AutoHashMapUnmanaged(u64, Anim) = .empty,
+    /// What widgets remember between frames (`state`).
+    memory: std.AutoHashMapUnmanaged(u64, Memory) = .empty,
     /// What `ui.motion` remembers of each animated box.
     motion: @import("motion/store.zig").Store = .{},
     /// The system asks for reduced motion: `ui.motion` moves at once.
@@ -217,6 +221,7 @@ pub const Context = struct {
         c.hot_path.deinit(c.gpa);
         c.anims.deinit(c.gpa);
         c.motion.deinit(c.gpa);
+        c.memory.deinit(c.gpa);
         c.layers.deinit(c.gpa);
         c.scroll.deinit(c.gpa);
         c.edits.deinit(c.gpa);
@@ -290,6 +295,16 @@ pub const Context = struct {
             }
             for (stale[0..n]) |k| _ = c.anims.remove(k);
             c.motion.forget(c.frame, 120);
+            n = 0;
+            var mit = c.memory.iterator();
+            while (mit.next()) |e| {
+                if (n == stale.len) break;
+                if (c.frame - e.value_ptr.frame > 120) {
+                    stale[n] = e.key_ptr.*;
+                    n += 1;
+                }
+            }
+            for (stale[0..n]) |k| _ = c.memory.remove(k);
         }
     }
 
@@ -424,6 +439,29 @@ pub const Context = struct {
     /// refresh in between.
     pub fn frameIn(c: *Context, seconds: f32) void {
         c.frame_in = if (c.frame_in) |f| @min(f, seconds) else seconds;
+    }
+
+    /// A widget's state of type `T` (a small struct with defaults), kept
+    /// under `key` in the box now open while it's drawn every so often;
+    /// forgotten a couple of seconds after it isn't.
+    pub fn state(c: *Context, comptime T: type, key: []const u8) *T {
+        comptime std.debug.assert(@sizeOf(T) <= 48 and @alignOf(T) <= 16);
+        var h = std.hash.Wyhash.init(c.peekId(null));
+        h.update("state:");
+        h.update(key);
+        const gop = c.memory.getOrPut(c.gpa, h.final()) catch {
+            const S = struct {
+                var spare: T = .{};
+            };
+            S.spare = .{};
+            return &S.spare;
+        };
+        if (!gop.found_existing) {
+            gop.value_ptr.* = .{ .bytes = undefined, .frame = c.frame };
+            @as(*T, @ptrCast(&gop.value_ptr.bytes)).* = .{};
+        }
+        gop.value_ptr.frame = c.frame;
+        return @ptrCast(&gop.value_ptr.bytes);
     }
 
     /// Moves `id`'s animated value toward `target`; returns the current value.

@@ -46,6 +46,8 @@ const plat = switch (builtin.os.tag) {
 /// The Objective-C runtime (macOS only).
 pub const objc = if (mac) @import("objc.zig") else struct {};
 pub const ui = @import("ui/ui.zig");
+/// Components after GPUI Kit: buttons, overlays, tabs, forms, toasts.
+pub const kit = @import("kit/kit.zig");
 pub const tsgen = @import("tsgen.zig");
 
 pub const App = plat.app.App;
@@ -88,6 +90,8 @@ pub const version = @import("build_options").version;
 test {
     _ = tsgen;
     _ = ui;
+    _ = kit;
+    std.testing.refAllDecls(kit);
     _ = @import("menu_types.zig");
     _ = @import("update.zig");
     if (!mac) {

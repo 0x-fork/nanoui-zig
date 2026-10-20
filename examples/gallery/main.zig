@@ -20,6 +20,7 @@ const Gallery = struct {
     items: [64]Item = undefined,
     count: usize = 0,
     motion: @import("motion.zig").Demo = .{},
+    kit: @import("kit.zig").Demo = .{},
 
     fn add(g: *Gallery, title: []const u8) void {
         if (g.count == g.items.len or title.len == 0) return;
@@ -36,6 +37,7 @@ const Gallery = struct {
         if (g.page == 3) return g.bigList(c);
         if (g.page == 4) return g.glass(c);
         if (g.page == 5) return g.motion.page(c);
+        if (g.page == 6) return g.kit.view(c);
         ui.scroll(c, .{ .grow = 1, .height = .fill, .padding = .all(28), .gap = 20 });
         defer ui.end(c);
         switch (g.page) {
@@ -68,6 +70,7 @@ const Gallery = struct {
             .{ "List", "list.bullet" },
             .{ "Glass", "sparkles" },
             .{ "Motion", "wand.and.stars" },
+            .{ "Kit", "square.stack.3d.up" },
         };
         for (pages, 0..) |p, i| {
             const selected = g.page == i;

@@ -47,6 +47,18 @@ gpui-motion is dual licensed under MIT or Apache 2.0. nanoui takes it under
 MIT, whose text is kept verbatim in
 [`third_party/licenses/gpui-motion-MIT.txt`](third_party/licenses/gpui-motion-MIT.txt).
 
+## GPUI Kit
+
+`nanoui.kit` (`src/kit/`) follows the components of
+[GPUI Kit](https://github.com/longbridge/gpui-component) (gpui-component),
+Copyright 2024–2026 Longbridge, as of
+[`6c13c1f`](https://github.com/longbridge/gpui-component/tree/6c13c1fcd73fa4b2b67e6c6ceaec3ab608e65501). It
+takes their set and names, the button variants and sizes, the tab styles,
+and the shape of dialogs, popovers, menus, notifications, alerts, tags,
+avatars and form fields, rewritten for nanoui. GPUI Kit is licensed under
+the Apache License 2.0, kept verbatim with its copyright line in
+[`third_party/licenses/GPUI-Kit-Apache-2.0.txt`](third_party/licenses/GPUI-Kit-Apache-2.0.txt).
+
 ## Apps
 
 [nanoterm](https://github.com/justrach/nanoterm) and

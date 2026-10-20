@@ -201,6 +201,44 @@ if (ui.motion.present(c, "toast", saved, .{ .initial = .{ .y = 24, .opacity = 0 
   <br><sub>The gallery's Motion page.</sub>
 </p>
 
+### Kit
+
+`nanoui.kit` is a set of components after GPUI Kit, drawn by nanoui and
+moved by `ui.motion`:
+
+- **Buttons** in its variants (primary, danger, ghost, outline, link, …) and
+  sizes, with icons, loading and tooltips.
+- **Display:** tags, badges, avatars and stacks of them, alerts, skeletons,
+  spinners, progress bars and rings.
+- **Overlays:** tooltips, popovers, menus, dialogs, sheets and toasts. They
+  open on layers over the page, go where they fit, and close on Escape or a
+  click elsewhere.
+- **Navigation:** tabs whose marker slides, breadcrumbs, pagination, and
+  accordions that open to their content's height.
+- **Forms:** radio groups, selects you can move through with the arrow keys,
+  number inputs, and labelled fields with hints and errors.
+
+```zig
+const kit = nanoui.kit;
+
+if (kit.button(c, "Delete", .{ .variant = .danger, .icon = "trash" }).clicked) confirm = true;
+if (kit.dialog(c, "confirm", &confirm, .{ .title = "Delete project?", .ok = "Delete", .ok_variant = .danger })) |d| {
+    ui.text(c, "Its files and history go too.", .{});
+    if (d.end() == .ok) toaster.push(.{ .status = .danger, .title = "Deleted" });
+}
+_ = kit.tabs(c, &.{ "Overview", "Activity", "Settings" }, &tab, .{ .variant = .segmented });
+toaster.view(c); // last: toasts over everything
+```
+
+Overlays are made of two new box properties: `layer` draws a box above the
+page and unclipped, and `fixed` places it from the window's corner.
+`Context.state` keeps a widget's small state between frames.
+
+<p align="center">
+  <img src="docs/images/gallery-kit.png" alt="The gallery's Kit page: buttons in every variant and size, tags, avatars, alerts, progress" width="640">
+  <br><sub>The gallery's Kit page.</sub>
+</p>
+
 ## Web pages
 
 ```zig
@@ -342,7 +380,8 @@ plugins yet. Apps update themselves from GitHub releases on macOS
 ## License
 
 nanoui is licensed under the [MIT License](LICENSE). Material from mygo (MIT),
-GPUI (Apache 2.0) and gpui-motion (MIT) keeps its own notices; see
+GPUI (Apache 2.0), gpui-motion (MIT) and GPUI Kit (Apache 2.0) keeps its own
+notices; see
 [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Credits
@@ -370,5 +409,8 @@ nanoui stands on the shoulders of these projects:
   [1keep](https://github.com/1bye): `ui.motion` follows its model and API.
   That covers interruptible targets, presence, keyframes, stagger, layout
   animation, its exact springs and its easing curves.
+- **[GPUI Kit](https://github.com/longbridge/gpui-component)** by
+  [Longbridge](https://github.com/longbridge): `nanoui.kit` follows its
+  components, their variants and their names.
 
 <p align="center"><sub>Built in Zig 0.17 · <a href="AGENTS.md">AGENTS.md</a> · <a href="hillclimb/README.md">benchmarks</a> · <a href="LICENSE">MIT</a> · <a href="THIRD_PARTY_NOTICES.md">third-party notices</a></sub></p>
