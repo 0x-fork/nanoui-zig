@@ -327,13 +327,21 @@ renderer on a Mac. Linux is also tested in a container
       <p><a href="https://github.com/justrach/nanomon"><strong>nanomon</strong></a>: an activity monitor in Codegraff colors, with cell graphs of CPU, memory, GPU, disk and network. You can quit several processes at once, and a graff bubble suggests what to quit.</p>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://github.com/justrach/nanostudio"><img src="docs/images/nanostudio-dark.png" alt="nanostudio: the editor with a zoom on the timeline"></a>
+      <p><a href="https://github.com/justrach/nanostudio"><strong>nanostudio</strong></a>: a screen recorder and editor. It records a display or a window with its sound, then zooms where you clicked. You can trim, speed up and dress the take, and export it. Every frame, preview and export alike, is a nanoui view.</p>
+    </td>
+    <td width="50%" valign="top"></td>
+  </tr>
 </table>
 
 Download them for macOS:
 [nanoterm](https://github.com/justrach/nanoterm/releases/latest/download/nanoterm-macos-arm64.dmg) ·
-[nanomon](https://github.com/justrach/nanomon/releases/latest/download/nanomon-macos-arm64.dmg).
+[nanomon](https://github.com/justrach/nanomon/releases/latest/download/nanomon-macos-arm64.dmg) ·
+[nanostudio](https://github.com/justrach/nanostudio/releases/latest/download/nanostudio-macos-arm64.dmg).
 
-Both live in `apps/` as submodules, and each also builds on its own, fetching
+They live in `apps/` as submodules, and each also builds on its own, fetching
 nanoui pinned by commit. To build one against the nanoui next to it, with
 your changes, use `--fork`: `cd apps/nanomon && zig build run --fork=../..`.
 
