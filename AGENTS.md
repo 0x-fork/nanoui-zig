@@ -6,8 +6,10 @@ system webview (WKWebView, macOS only for now) with typed Zig ↔ TypeScript
 IPC, or native UI that nanoui draws itself, in the manner of GPUI: with Metal
 and CoreText on macOS; on Linux (GTK 3, loaded with dlopen) and Windows
 (Win32) with nanoui's own TrueType text (`src/ui/tt/`) and CPU renderer
-(`src/ui/raster.zig`, tested against Metal). Every platform builds from any
-machine (`-Dtarget=...`).
+(`src/ui/raster.zig`, tested against Metal); on iOS (UIKit) with Metal and
+CoreText as on the Mac. Every platform builds from any machine
+(`-Dtarget=...`); iOS needs Xcode's SDK and Zig's lib fixed
+(`tools/ios/zig-lib.sh`).
 
 ## Hard rules
 
@@ -26,8 +28,9 @@ machine (`-Dtarget=...`).
   `dlopen`/`dlsym` (`src/linux/gtk.zig`). No `@cImport`, no `.c`/`.m`.
 - **Every platform keeps building.** After a change, build for Linux and
   Windows too (`zig build -Dtarget=aarch64-linux-gnu --prefix zig-out/linux`,
-  `-Dtarget=x86_64-windows-gnu`), and run the Linux tests in the container
-  (`tools/linux.Dockerfile`, `zig build test-bin`).
+  `-Dtarget=x86_64-windows-gnu`), and iOS
+  (`zig build $(sh tools/ios/zig-lib.sh) -Dtarget=aarch64-ios-simulator`), and run the
+  Linux tests in the container (`tools/linux.Dockerfile`, `zig build test-bin`).
 - **Never show windows on the developer's screen** while working: no
   running examples or benchmark apps windowed, nothing that activates an
   app or takes focus (nanoterm may be shown when asked). Live apps are
@@ -100,9 +103,13 @@ src/ui/png_decode.zig PNG to pixels where ImageIO isn't (Linux, Windows, portabl
 src/platform.zig      what differs by OS below the UI (event loop, clipboard)
 src/linux/            GTK 3 backend: app, window, surface, dialogs, fd watches
 src/windows/          Win32 backend: app, window, surface, dialogs
-src/menu_accel.zig    menus as accelerators (Linux, Windows)
+src/ios/              UIKit backend: app and scenes, windows as stacked screens,
+                      surface (Metal view), touch (pointer, scrolling, flings),
+                      keys (hardware keys, software keyboard), desktop, dialogs
+src/menu_accel.zig    menus as accelerators (Linux, Windows, iOS)
 src/kit/              nanoui.kit: components after GPUI Kit (buttons, overlays, tabs, forms)
 tools/*.Dockerfile    Linux (GTK, Xvfb) and Windows (Wine) test images
+tools/ios/            app bundles (bundle.zig), the Simulator (sim.sh), Zig's lib fixed (zig-lib.sh)
 examples/             hello (webview), counter and gallery (native UI)
 hillclimb/            headless benchmarks against mygo (its own package)
 apps/nanoterm/        the first app: a Warp-like terminal with ACP agents
@@ -124,6 +131,7 @@ zig build run-hello       # webview + typed IPC
 zig build run-counter     # native UI
 zig build run-gallery     # native UI widgets
 zig build gen             # write examples/hello/frontend/nanoui.{js,d.ts}
+zig build $(sh tools/ios/zig-lib.sh) run-gallery -Dtarget=aarch64-ios-simulator   # the gallery in a simulator booted headless (xcrun simctl boot)
 sh tools/version.sh 0.2.1 # set the version; commit, push tag v0.2.1 to release
 cd hillclimb && zig build run -- --label "change"   # climb: compare with mygo and history
 cd apps/nanomon && zig build test --fork=../..     # an app (a submodule) against this nanoui, not its pinned one

@@ -71,10 +71,12 @@ pub const Renderer = struct {
         objc.msg(void, layer, "setMaximumDrawableCount:", .{@as(objc.NSUInteger, 2)});
         objc.msg(void, layer, "setOpaque:", .{objc.YES});
         // Colors are sRGB, as in CSS: tag them so the display matches them.
-        if (cf.CGColorSpaceCreateWithName(cf.kCGColorSpaceSRGB)) |srgb| {
+        // (iOS treats untagged colors as sRGB, and older iOS lacks the setter.)
+        const tags = objc.msg(objc.BOOL, layer, "respondsToSelector:", .{objc.sel("setColorspace:")});
+        if (tags) if (cf.CGColorSpaceCreateWithName(cf.kCGColorSpaceSRGB)) |srgb| {
             defer cf.CGColorSpaceRelease(srgb);
             objc.msg(void, layer, "setColorspace:", .{srgb});
-        }
+        };
         return .{ .device = device, .queue = queue, .pipeline = pipeline, .glass = glass, .layer = layer, .in_flight = objc.dispatch_semaphore_create(frames_in_flight) };
     }
 

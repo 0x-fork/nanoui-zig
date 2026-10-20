@@ -58,6 +58,11 @@ pub fn Options(comptime Window: type) type {
         always_on_top: bool = false,
         /// Shown at once; otherwise call `show`.
         visible: bool = true,
+        /// iOS: the view spans the whole screen, under the status bar and
+        /// the home indicator, and keeps clear of them itself
+        /// (`ui.Context.safe_area`); without it, the view is laid out
+        /// inside the safe area. Elsewhere it changes nothing.
+        full_bleed: bool = false,
         /// Called as the window closes, before it is freed.
         on_close: ?Callback(Window) = null,
         content: Content,
