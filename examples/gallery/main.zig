@@ -21,6 +21,7 @@ const Gallery = struct {
     count: usize = 0,
     motion: @import("motion.zig").Demo = .{},
     kit: @import("kit.zig").Demo = .{},
+    glass: @import("glass.zig").Demo = .{},
 
     fn add(g: *Gallery, title: []const u8) void {
         if (g.count == g.items.len or title.len == 0) return;
@@ -35,7 +36,7 @@ const Gallery = struct {
         defer ui.end(c);
         g.sidebar(c);
         if (g.page == 3) return g.bigList(c);
-        if (g.page == 4) return g.glass(c);
+        if (g.page == 4) return g.glass.view(c);
         if (g.page == 5) return g.motion.page(c);
         if (g.page == 6) return g.kit.view(c);
         ui.scroll(c, .{ .grow = 1, .height = .fill, .padding = .all(28), .gap = 20 });
@@ -200,40 +201,6 @@ const Gallery = struct {
             ui.textf(c, .{ .size = 12, .color = th.muted, .mono = true }, "#{x:0>4}", .{n});
         }
         rows.end();
-    }
-
-    /// Liquid Glass: a toolbar floats over content that scrolls under it,
-    /// with a tinted button on it, and a pane of clear glass beside.
-    fn glass(g: *Gallery, c: *ui.Context) void {
-        const th = c.theme;
-        const page = ui.div(c).grow().hFull().clip();
-        defer page.end();
-        {
-            const content = ui.div(c).column().sizeFull().scrollY().px(28).pt(40).pb(28).gap(14);
-            defer content.end();
-            const hues = [_]u24{ 0xe8453c, 0xf2a93b, 0x3fae5a, 0x2f6fd0, 0x8e44ad, 0x16a3a3 };
-            for (0..18) |i| {
-                const card = ui.div(c).row().wFull().h(64).px(18).gap(12).itemsCenter().rounded(16).bg(.hex(hues[i % hues.len]));
-                defer card.end();
-                ui.icon(c, "photo", .{ .size = 18, .color = .white });
-                ui.textf(c, .{ .size = 15, .weight = .semibold, .color = .white }, "Scroll me under the glass · {d}", .{i + 1});
-            }
-        }
-        {
-            const bar = ui.div(c).absolute().offset(20, 20).w(c.size.w - 240).h(56).row().itemsCenter().gap(10).px(16).rounded(28).glass(.{});
-            defer bar.end();
-            ui.icon(c, "sparkles", .{ .size = 16, .color = th.text });
-            ui.text(c, "Liquid Glass", .{ .size = 15, .weight = .semibold });
-            ui.spacer(c);
-            ui.label(c, c.print("{d} taps", .{g.clicks}));
-            const done = ui.div(c).px(16).py(8).rounded(16).glass(.{ .tint = th.accent }).control();
-            defer done.end();
-            if (done.clicked()) g.clicks += 1;
-            ui.text(c, "Tap", .{ .size = 13, .weight = .semibold, .color = th.accent_text });
-        }
-        const pane = ui.div(c).absolute().offset(c.size.w - 380, 140).w(140).h(140).rounded(36).glass(.{ .style = .clear }).itemsCenter().justifyCenter();
-        defer pane.end();
-        ui.text(c, "Clear", .{ .size = 15, .weight = .semibold, .color = .white });
     }
 
     fn typography(_: *Gallery, c: *ui.Context) void {

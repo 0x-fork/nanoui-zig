@@ -85,6 +85,8 @@ pub const PopoverOptions = struct {
     gap: f32 = 6,
     /// A click outside closes it.
     dismissable: bool = true,
+    /// A pane of Liquid Glass, as macOS 26's menus are.
+    glass: bool = false,
 };
 
 /// An open popover: draw what's in it, then `end`.
@@ -118,7 +120,8 @@ pub fn popover(c: *ui.Context, id: []const u8, open: *bool, anchor: ?ui.Rect, op
     }) orelse return null;
     const size = if (c.rects.get(panel_id)) |r| ui.Size{ .w = r.w, .h = r.h } else ui.Size{ .w = opts.width orelse 220, .h = 120 };
     const at = place(c, a, size, opts.placement, opts.gap);
-    var d = ui.div(c).fixed().offset(at.x, at.y).layer(layer_popover).column().gap(2).p(opts.padding).rounded(t.radius + 2).bg(t.popover).border(t.border).shadow(.{ .color = t.shadow.alpha(0.9), .blur = 24, .y = 8 });
+    var d = ui.div(c).fixed().offset(at.x, at.y).layer(layer_popover).column().gap(2).p(opts.padding).rounded(t.radius + 2).shadow(.{ .color = t.shadow.alpha(0.9), .blur = 24, .y = 8 });
+    d = if (opts.glass) d.rounded(t.radius + 8).glass(.{}) else d.bg(t.popover).border(t.border);
     if (opts.width) |w| d = d.w(w);
     // It takes the pointer (and so its clicks aren't "outside").
     _ = d.interaction();
@@ -140,9 +143,9 @@ pub const MenuItem = struct {
 
 /// A menu by `anchor` while `open.*`; the index of the item chosen (and
 /// then it closes).
-pub fn menu(c: *ui.Context, id: []const u8, open: *bool, anchor: ?ui.Rect, items: []const MenuItem, opts: struct { placement: Placement = .bottom_start, width: f32 = 220 }) ?usize {
+pub fn menu(c: *ui.Context, id: []const u8, open: *bool, anchor: ?ui.Rect, items: []const MenuItem, opts: struct { placement: Placement = .bottom_start, width: f32 = 220, glass: bool = false }) ?usize {
     const t = kit.tokens(c);
-    const p = popover(c, id, open, anchor, .{ .placement = opts.placement, .width = opts.width, .padding = 5 }) orelse return null;
+    const p = popover(c, id, open, anchor, .{ .placement = opts.placement, .width = opts.width, .padding = if (opts.glass) 7 else 5, .glass = opts.glass }) orelse return null;
     defer p.end();
     var chosen: ?usize = null;
     const checks = for (items) |it| {

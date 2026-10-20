@@ -1,8 +1,9 @@
 //! Buttons as GPUI Kit has them: a variant (default, primary, secondary,
 //! danger, info, success, warning, ghost, outline, link, text), a size,
 //! an icon before or after, loading (a spinner in place of the icon),
-//! selected (a toggle's on), disabled, and as wide as their row. Hover and
-//! press ease; a press gives a little.
+//! selected (a toggle's on), disabled, and as wide as their row; `glass`
+//! makes it a pane of Liquid Glass (tinted by its variant). Hover and press
+//! spring: a press gives a little, glass more, and it bounces back.
 const std = @import("std");
 const ui = @import("../ui/ui.zig");
 const kit = @import("kit.zig");
@@ -26,6 +27,9 @@ pub const Options = struct {
     pill: bool = false,
     /// Shown when the pointer rests on it.
     tooltip: []const u8 = "",
+    /// Liquid Glass instead of a fill: clear for default, ghost and text,
+    /// tinted by the variant's color otherwise.
+    glass: bool = false,
 };
 
 const Look = struct { bg: Color, fg: Color, border: ?Color = null, underline: bool = false };
@@ -79,10 +83,20 @@ pub fn button(c: *ui.Context, label: []const u8, opts: Options) ui.Interaction {
     }
     n.style.background = bg;
     n.style.border = l.border;
-    if (opts.variant == .default) n.style.shadow = .{ .color = t.shadow.alpha(0.4), .blur = 2, .y = 1 };
+    if (opts.variant == .default and !opts.glass) n.style.shadow = .{ .color = t.shadow.alpha(0.4), .blur = 2, .y = 1 };
+    if (opts.glass) {
+        // The variant's color tints the glass; clear variants stay clear.
+        const tinted = l.bg.a > 0.99 and opts.variant != .default and opts.variant != .secondary;
+        n.style.glass = .{ .tint = if (tinted) l.bg.alpha(0.85) else .transparent };
+        n.style.background = null;
+        n.style.border = null;
+    }
     n.style.opacity = if (opts.disabled) 0.45 else 1;
-    n.style.scale = 1 - press * 0.03;
-    var fg = l.fg;
+    // A spring: down on a press, up a touch on hover, a bounce on release.
+    const give: f32 = if (opts.glass) 0.07 else 0.035;
+    const lift: f32 = if (opts.glass) 0.03 else 0;
+    n.style.scale = ui.motion.number(c, "scale", if (live and it.pressed) 1 - give else if (live and it.hovered) 1 + lift else 1, .{ .spring = ui.motion.Spring.bouncy });
+    var fg = if (opts.glass and n.style.glass.?.tint.a == 0) t.foreground else l.fg;
     if (plain) fg = fg.mix(t.muted, hover * 0.35);
     if (opts.loading) {
         kit.spinner(c, .{ .size = size, .color = fg });

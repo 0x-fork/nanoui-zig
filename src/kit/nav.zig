@@ -7,7 +7,8 @@ const ui = @import("../ui/ui.zig");
 const kit = @import("kit.zig");
 const motion = ui.motion;
 
-pub const TabsVariant = enum { underline, pill, segmented, outline };
+/// `glass`: a bar of Liquid Glass with a tinted lens of glass that slides.
+pub const TabsVariant = enum { underline, pill, segmented, outline, glass };
 
 /// A row of tabs; true when `selected.*` changed.
 pub fn tabs(c: *ui.Context, items: []const []const u8, selected: *usize, opts: struct { variant: TabsVariant = .underline, size: kit.Size = .md }) bool {
@@ -19,6 +20,7 @@ pub fn tabs(c: *ui.Context, items: []const []const u8, selected: *usize, opts: s
         .pill => bar.gap(4),
         .segmented => bar.gap(2).p(3).rounded(t.radius).bg(t.surface_hover),
         .outline => bar.gap(4),
+        .glass => bar.gap(2).p(4).roundedFull().glass(.{}),
     };
     const bar_rect = bar.interaction().rect;
     defer bar.end();
@@ -34,6 +36,7 @@ pub fn tabs(c: *ui.Context, items: []const []const u8, selected: *usize, opts: s
                 .pill => ui.div(c).absolute().offset(0, (br.h - r.h) / 2).h(r.h).rounded(r.h / 2).bg(t.primary),
                 .segmented => ui.div(c).absolute().offset(-3, (br.h - r.h) / 2 - 3).h(r.h).rounded(t.radius - 2).bg(t.surface).shadow(.{ .color = t.shadow.alpha(0.6), .blur = 3, .y = 1 }),
                 .outline => ui.div(c).absolute().offset(0, (br.h - r.h) / 2).h(r.h).rounded(t.radius).border(t.primary),
+                .glass => ui.div(c).absolute().offset(-4, (br.h - r.h) / 2 - 4).h(r.h).roundedFull().glass(.{ .tint = t.primary.alpha(0.55) }),
             };
             const marker = m.motion(f);
             marker.end();
@@ -59,6 +62,7 @@ pub fn tabs(c: *ui.Context, items: []const []const u8, selected: *usize, opts: s
         const fg = switch (opts.variant) {
             .pill => if (on) t.primary_foreground else t.muted,
             .outline => if (on) t.primary else t.muted,
+            .glass => if (on) t.primary_foreground else t.foreground,
             else => if (on) t.foreground else t.muted,
         };
         ui.text(c, label, .{ .size = size, .weight = if (on) .semibold else .medium, .color = if (it.hovered and !on) fg.mix(t.foreground, 0.5) else fg });

@@ -36,6 +36,8 @@ pub const Toaster = struct {
     next: u64 = 1,
     corner: Corner = .bottom_right,
     width: f32 = 340,
+    /// Toasts of Liquid Glass.
+    glass: bool = false,
 
     pub fn deinit(ts: *Toaster) void {
         for (ts.items.items) |e| ts.gpa.free(e.text);
@@ -92,7 +94,8 @@ pub const Toaster = struct {
                 continue;
             };
             const col = kit.statusColor(t, e.toast.status);
-            const d = ui.div(c).fixed().offset(x, at_y).w(ts.width).layer(layer_toast).row().gap(10).itemsStart().p(12).rounded(t.radius + 2).bg(t.popover).border(t.border).shadow(.{ .color = t.shadow.alpha(0.9), .blur = 22, .y = 8 }).motion(f);
+            var d = ui.div(c).fixed().offset(x, at_y).w(ts.width).layer(layer_toast).row().gap(10).itemsStart().p(12).rounded(t.radius + 2).shadow(.{ .color = t.shadow.alpha(0.9), .blur = 22, .y = 8 });
+            d = (if (ts.glass) d.rounded(t.radius + 8).glass(.{}) else d.bg(t.popover).border(t.border)).motion(f);
             _ = d.interaction();
             defer d.end();
             if (e.toast.status != .neutral) ui.icon(c, kit.statusIcon(e.toast.status), .{ .size = 15, .color = col });
