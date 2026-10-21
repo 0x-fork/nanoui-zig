@@ -26,7 +26,8 @@ pub const Renderer = struct {
     pipeline: objc.Object,
     glass: metal_glass.Glass,
     layer: objc.Object,
-    live_resize: bool = false,
+    /// Frames go out in the window's transaction (see `setInTransaction`).
+    in_transaction: bool = false,
     /// Instances go into one of three buffers, reused once the GPU is done
     /// with the frame that last used it.
     buffers: [frames_in_flight]?objc.Object = @splat(null),
@@ -70,6 +71,9 @@ pub const Renderer = struct {
         // (a window-sized buffer, 13 MB for a large window).
         objc.msg(void, layer, "setMaximumDrawableCount:", .{@as(objc.NSUInteger, 2)});
         objc.msg(void, layer, "setOpaque:", .{objc.YES});
+        // A frame waits for a drawable rather than being dropped: a dropped
+        // one in a resize leaves the last, at the old size, stretched.
+        objc.msg(void, layer, "setAllowsNextDrawableTimeout:", .{objc.NO});
         // Colors are sRGB, as in CSS: tag them so the display matches them.
         // (iOS treats untagged colors as sRGB, and older iOS lacks the setter.)
         const tags = objc.msg(objc.BOOL, layer, "respondsToSelector:", .{objc.sel("setColorspace:")});
@@ -158,8 +162,8 @@ pub const Renderer = struct {
         const cmd = self.encode(texture, buffer, instances, atlas, size, clear, held);
         var done = objc.Block(Renderer, &.{objc.Object}).init(self, frameDone);
         objc.msg(void, cmd, "addCompletedHandler:", .{@as(*anyopaque, @ptrCast(&done))});
-        if (self.live_resize) {
-            // In the layer's transaction: a resizing window never shows a
+        if (self.in_transaction) {
+            // In the window's transaction: a resizing window never shows a
             // stretched or misplaced frame.
             objc.msg(void, cmd, "commit", .{});
             objc.msg(void, cmd, "waitUntilScheduled", .{});
@@ -192,9 +196,16 @@ pub const Renderer = struct {
         return buf;
     }
 
-    pub fn setLiveResize(self: *Renderer, on: bool) void {
-        self.live_resize = on;
+    /// Frames drawn while on are presented in the window's (Core
+    /// Animation's) transaction, as GPUI presents a layer it was asked to
+    /// display: the window's new size and its frame at that size reach the
+    /// screen together.
+    pub fn setInTransaction(self: *Renderer, on: bool) void {
+        self.in_transaction = on;
         objc.msg(void, self.layer, "setPresentsWithTransaction:", .{on});
+    }
+
+    pub fn setLiveResize(self: *Renderer, on: bool) void {
         // A frame presented in the window's transaction stays the
         // compositor's until the next: with two drawables, each step of a
         // resize would wait a refresh for one. A third while resizing.

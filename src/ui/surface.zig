@@ -43,8 +43,8 @@ pub const Surface = struct {
     /// A frame was wanted while the window was hidden: run it once visible.
     pending: bool = false,
     dead: bool = false,
-    /// The window is being resized: only its size changes draw (each in the
-    /// window's transaction); the link waits, and what else asks for a
+    /// The window is being resized: only its size changes draw (each when
+    /// the layer is displayed); the link waits, and what else asks for a
     /// frame (output, an animation) gets the resize's next one.
     resizing: bool = false,
     cursor: ctx_mod.Cursor = .arrow,
@@ -85,6 +85,12 @@ pub const Surface = struct {
         // A layer-hosting view: the Metal layer is ours.
         objc.msg(void, nsview, "setLayer:", .{renderer.layer});
         objc.msg(void, nsview, "setWantsLayer:", .{objc.YES});
+        // As GPUI's: a layer whose bounds change asks the view to display it
+        // (`displayLayer:`), in the transaction that changes the window's
+        // frame, whatever changed it: a drag, a zoom, tiling, full screen.
+        objc.msg(void, renderer.layer, "setDelegate:", .{nsview});
+        objc.msg(void, renderer.layer, "setNeedsDisplayOnBoundsChange:", .{objc.YES});
+        objc.msg(void, renderer.layer, "setAutoresizingMask:", .{@as(c_uint, 2 | 16)}); // width, height sizable
         objc.msg(void, window.nswindow, "setContentView:", .{nsview});
         objc.msg(void, window.nswindow, "setAcceptsMouseMovedEvents:", .{objc.YES});
         _ = objc.msg(objc.BOOL, window.nswindow, "makeFirstResponder:", .{nsview});
@@ -290,6 +296,7 @@ const view_methods = [_]objc.Method{
                 .{ .name = "keyDown:", .imp = &keyDown, .types = "v@:@" },
                 .{ .name = "paste:", .imp = &paste, .types = "v@:@" },
                 .{ .name = "setFrameSize:", .imp = &setFrameSize, .types = "v@:{CGSize=dd}" },
+                .{ .name = "displayLayer:", .imp = &displayLayer, .types = "v@:@" },
                 .{ .name = "viewDidChangeBackingProperties", .imp = &backingChanged, .types = "v@:" },
                 .{ .name = "viewDidChangeEffectiveAppearance", .imp = &backingChanged, .types = "v@:" },
                 .{ .name = "updateTrackingAreas", .imp = &updateTrackingAreas, .types = "v@:" },
@@ -503,10 +510,24 @@ fn liveResizeEnd(obj: objc.Object, _: objc.SEL) callconv(.c) void {
 }
 
 fn setFrameSize(obj: objc.Object, _: objc.SEL, size: objc.CGSize) callconv(.c) void {
+    const old = objc.msg(objc.CGRect, obj, "frame", .{}).size;
+    if (old.width == size.width and old.height == size.height) return;
     objc.msgSuper(void, obj, objc.class("NSView"), "setFrameSize:", .{size});
     const s = surfaceOf(obj) orelse return;
     s.updateGeometry();
+    // The frame is drawn when the layer is displayed (`displayLayer:`), in
+    // this resize's transaction; a hidden window's waits until it shows.
+    if (s.visible()) objc.msg(void, s.renderer.layer, "setNeedsDisplay", .{}) else s.frame();
+}
+
+/// Core Animation displays the layer (its bounds changed): a frame now,
+/// presented in the same transaction, as GPUI's `display_layer`.
+fn displayLayer(obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) void {
+    const s = surfaceOf(obj) orelse return;
+    s.renderer.setInTransaction(true);
+    s.setPaced(false);
     s.frame();
+    s.renderer.setInTransaction(false);
 }
 
 fn backingChanged(obj: objc.Object, _: objc.SEL) callconv(.c) void {
