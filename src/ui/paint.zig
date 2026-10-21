@@ -39,6 +39,33 @@ fn push(c: *Context, out: *std.ArrayList(metal.Instance), inst: metal.Instance) 
     out.append(c.gpa, inst) catch {};
 }
 
+/// A canvas's shapes, moved to its box and clipped to it; those wholly
+/// outside what shows of it are left out.
+fn paintCanvas(c: *Context, out: *std.ArrayList(metal.Instance), cv: *const @import("draw.zig").Canvas, r: types.Rect, visible: types.Rect, opacity: f32) void {
+    const clip = metal.clip4(visible);
+    out.ensureUnusedCapacity(c.gpa, cv.shapes.items.len) catch return;
+    for (cv.shapes.items) |shape| {
+        var i = shape;
+        i.rect[0] += r.x;
+        i.rect[1] += r.y;
+        if (i.rect[0] > clip[2] or i.rect[1] > clip[3] or i.rect[0] + i.rect[2] < clip[0] or i.rect[1] + i.rect[3] < clip[1]) continue;
+        if (i.kind == metal.Kind.segment or i.kind == metal.Kind.triangle) {
+            i.uv[0] += r.x;
+            i.uv[1] += r.y;
+            i.uv[2] += r.x;
+            i.uv[3] += r.y;
+        }
+        if (i.kind == metal.Kind.triangle) {
+            i.border_color[0] += r.x;
+            i.border_color[1] += r.y;
+        }
+        i.color[3] *= opacity;
+        i.border_color[3] *= if (i.kind == metal.Kind.quad) opacity else 1;
+        i.clip = clip;
+        out.appendAssumeCapacity(i);
+    }
+}
+
 /// `scrolled`: how far the scrolling boxes it's in have scrolled it up.
 fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip: types.Rect, opacity_in: f32, selectable_in: bool, scrolled: f32) void {
     const n = c.node(index).*;
@@ -112,6 +139,7 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
                 .border_width = @floatFromInt(tx.slot),
                 .clip = clip4,
             }),
+            .canvas => |cv| paintCanvas(c, out, cv, r, visible, opacity),
             .none => {},
         }
     }

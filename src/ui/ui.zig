@@ -58,6 +58,11 @@ pub const spacer = widgets.spacer;
 pub const divider = widgets.divider;
 pub const image = widgets.image;
 pub const texture = widgets.texture;
+/// A box to draw lines, triangles, polygons and circles in (draw.zig).
+pub const canvas = @import("draw.zig").canvas;
+pub const Canvas = @import("draw.zig").Canvas;
+pub const Stroke = @import("draw.zig").Stroke;
+pub const triangulate = @import("draw.zig").triangulate;
 pub const Texture = @import("gpu.zig").Texture;
 pub const ImageOptions = widgets.ImageOptions;
 pub const text = widgets.text;
@@ -119,6 +124,8 @@ test {
     _ = @import("tests_keymap.zig");
     _ = @import("tests_multiline.zig");
     _ = @import("tests_texture.zig");
+    _ = @import("tests_canvas.zig");
+    _ = @import("draw.zig");
     _ = @import("tests_motion.zig");
     _ = @import("tests_layer.zig");
     _ = @import("tests_safe_area.zig");
