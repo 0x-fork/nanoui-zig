@@ -33,7 +33,7 @@ pub const Com = extern struct {
     vtable: [*]const *const anyopaque,
 
     fn slot(c: *Com, comptime T: type, i: usize) T {
-        return @ptrCast(c.vtable[i]);
+        return @ptrCast(@alignCast(c.vtable[i]));
     }
 
     pub fn release(c: *Com) void {

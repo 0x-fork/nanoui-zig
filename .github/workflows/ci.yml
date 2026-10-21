@@ -24,6 +24,8 @@ jobs:
       - run: zig build test
       - run: zig build test -Dportable=true
       - run: zig build -Dtarget=x86_64-windows-gnu --prefix zig-out/windows
+      # Windows on Arm too: COM's function pointers are aligned there.
+      - run: zig build -Dtarget=aarch64-windows-gnu --prefix zig-out/windows-arm64
       - run: zig build test-nui
       - name: nui makes an app that builds, passes its test and renders
         run: |
