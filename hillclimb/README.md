@@ -35,6 +35,11 @@ last`) and with its best (`Δ best`). Changes within ±5% are noise.
 - **scroll**: a plain column of 1000 rows, clipped, moving every frame.
 - **list**: a virtualized list of 100 000 rows, scrolled every frame.
 - **dashboard**: 12 cards of text, a large number and a progress bar.
+- **springs**: 2 000 boxes whose targets move every frame, through `ui.motion`.
+- **letters**: staggered animated text that restarts every 45 frames.
+
+On Linux (and elsewhere without Metal) the same scenes run through
+`ui.Tester` and the CPU raster, offscreen. No window opens.
 
 ## mygo's twin
 

@@ -120,6 +120,7 @@ test {
     _ = @import("tests_multiline.zig");
     _ = @import("tests_texture.zig");
     _ = @import("tests_motion.zig");
+    _ = @import("tests_motion_more.zig");
     _ = @import("tests_layer.zig");
     _ = @import("tests_safe_area.zig");
     _ = @import("motion/motion.zig");

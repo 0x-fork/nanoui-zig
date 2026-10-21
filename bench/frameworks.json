@@ -1,0 +1,13 @@
+{
+  "updated": "2026-10-21",
+  "host": {
+    "os": "linux",
+    "arch": "x86_64",
+    "renderer": "cpu",
+    "gpu": "none",
+    "note": "No discrete GPU in this environment. nanoui draws with src/ui/raster.zig through ui.Tester (offscreen). Mesa llvmpipe is used only if a windowed GL path is measured."
+  },
+  "runs": [],
+  "skips": [],
+  "wins": []
+}
