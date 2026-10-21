@@ -5,9 +5,88 @@
     "arch": "x86_64",
     "renderer": "cpu",
     "gpu": "none",
-    "note": "No discrete GPU in this environment. nanoui draws with src/ui/raster.zig through ui.Tester (offscreen). Mesa llvmpipe is used only if a windowed GL path is measured."
+    "note": "No discrete GPU. nanoui draws with src/ui/raster.zig through ui.Tester (offscreen, 900×640 at 2×). Mesa llvmpipe is present but windowed GL was not measured. rustc 1.83.0."
   },
-  "runs": [],
-  "skips": [],
-  "wins": []
+  "method": {
+    "warmup": 30,
+    "frames": 20,
+    "repeat": 1,
+    "window": false
+  },
+  "runs": [
+    {
+      "id": "nanoui-baseline",
+      "label": "linux-cpu-baseline",
+      "framework": "nanoui",
+      "renderer": "cpu",
+      "scenes": {
+        "boxes": { "frame_ms_p50": 0.075, "frame_ms_p95": 0.084, "encode_ms": 26.137, "cpu_ms": 93.118, "ops": 1201, "build_ms": 0.030, "layout_ms": 0.020, "paint_ms": 0.024 },
+        "text": { "frame_ms_p50": 0.201, "frame_ms_p95": 0.241, "encode_ms": 3.862, "cpu_ms": 11.597, "ops": 1150 },
+        "scroll": { "frame_ms_p50": 0.520, "frame_ms_p95": 0.581, "encode_ms": 2.391, "cpu_ms": 8.897, "ops": 573 },
+        "list": { "frame_ms_p50": 0.053, "frame_ms_p95": 0.061, "encode_ms": 2.094, "cpu_ms": 7.836, "ops": 576 },
+        "dashboard": { "frame_ms_p50": 0.043, "frame_ms_p95": 0.054, "encode_ms": 23.512, "cpu_ms": 60.971, "ops": 323 },
+        "springs": { "frame_ms_p50": 0.807, "frame_ms_p95": 0.844, "encode_ms": 4.912, "cpu_ms": 19.576, "ops": 2001, "build_ms": 0.682 },
+        "letters": { "frame_ms_p50": 0.101, "frame_ms_p95": 0.177, "encode_ms": 2.015, "cpu_ms": 6.616, "ops": 16 }
+      }
+    },
+    {
+      "id": "nanoui-after-climb",
+      "label": "keyInt + canvas reuse + channel t=0 + spring matrix cache",
+      "framework": "nanoui",
+      "renderer": "cpu",
+      "scenes": {
+        "boxes": { "frame_ms_p50": 0.074, "frame_ms_p95": 0.092, "encode_ms": 24.045, "cpu_ms": 91.212, "ops": 1201 },
+        "text": { "frame_ms_p50": 0.205, "frame_ms_p95": 0.209, "encode_ms": 2.066, "cpu_ms": 7.408, "ops": 1150 },
+        "scroll": { "frame_ms_p50": 0.510, "frame_ms_p95": 0.533, "encode_ms": 2.026, "cpu_ms": 8.094, "ops": 573 },
+        "list": { "frame_ms_p50": 0.057, "frame_ms_p95": 0.065, "encode_ms": 2.036, "cpu_ms": 7.660, "ops": 576 },
+        "dashboard": { "frame_ms_p50": 0.044, "frame_ms_p95": 0.053, "encode_ms": 12.803, "cpu_ms": 46.142, "ops": 323 },
+        "springs": { "frame_ms_p50": 0.571, "frame_ms_p95": 0.630, "encode_ms": 4.706, "cpu_ms": 18.656, "ops": 2001, "build_ms": 0.452 },
+        "letters": { "frame_ms_p50": 0.081, "frame_ms_p95": 0.187, "encode_ms": 0.713, "cpu_ms": 0.680, "ops": 16 }
+      }
+    },
+    {
+      "id": "egui-0.29",
+      "label": "egui 0.29 headless Context::run (tessellation only, no pixels)",
+      "framework": "egui",
+      "renderer": "cpu",
+      "scenes": {
+        "boxes": { "frame_ms_p50": 0.107, "ops": 601 },
+        "springs": { "frame_ms_p50": 0.334, "ops": 2001, "note": "sin() offsets, not spring physics" },
+        "text": { "frame_ms_p50": 0.315, "ops": 301 },
+        "scroll": { "frame_ms_p50": 1.431, "ops": 955 }
+      }
+    },
+    {
+      "id": "clay-0.14",
+      "label": "Clay layout + render commands (no pixels)",
+      "framework": "clay",
+      "renderer": "none",
+      "scenes": {
+        "boxes": { "frame_ms_p50": 0.064, "ops": 600 }
+      }
+    }
+  ],
+  "skips": [
+    { "framework": "gpui", "reason": "gpui 0.2+ and its deps need Rust 1.87+; this host has rustc 1.83.0" },
+    { "framework": "iced", "reason": "iced 0.13 not on crates.io index here; 0.12 pulls edition2024 crates (hashbrown 0.17) that Cargo 1.83 cannot parse" },
+    { "framework": "slint", "reason": "slint 1.6+ deps need Rust 1.87 / edition2024" },
+    { "framework": "dioxus", "reason": "dioxus pulls tokio 1.54 which needs Rust 1.85" },
+    { "framework": "flutter", "reason": "flutter SDK not installed" },
+    { "framework": "qt-quick", "reason": "qmake/qmlscene not installed" },
+    { "framework": "gtk4", "reason": "libgtk-4.so is present but gtk-4.pc / headers are not; skipped a C/Zig GTK widget bench" },
+    { "framework": "tauri", "reason": "not installed; web baseline not built" },
+    { "framework": "electron", "reason": "not installed; web baseline not built" },
+    { "framework": "mygo", "reason": "twin uses Metal (macOS only)" }
+  ],
+  "other": {
+    "startup": "Tester first frame is included in warmup; not isolated. Idle CPU is 0 by design (no poll).",
+    "binary_bytes": { "gallery_ReleaseFast": 8123936, "counter_ReleaseFast": 6908584, "nui_ReleaseFast": 4374992 },
+    "dropped_frames": "CPU raster of the boxes scene is ~24 ms encode (Gaussian shadows) so a 60 Hz CPU window would drop. Frame CPU stays under 1 ms. No GPU timestamps."
+  },
+  "wins": [
+    { "label": "ui.keyInt + springs scene integer keys", "scene": "springs", "metric": "frame_ms_p50", "gain_pct": 9.3 },
+    { "label": "reuse ui.Canvas instead of alloc+draw+free each frame", "scene": "letters", "metric": "encode_ms", "gain_pct": 64.6 },
+    { "label": "Channel.sample skips the spring matrix at t<=0 (retarget's second sample)", "scene": "springs", "metric": "frame_ms_p50", "gain_pct": 11.5 },
+    { "label": "Spring.matrix last-value cache for shared clock and spring", "scene": "springs", "metric": "frame_ms_p50", "gain_pct": 11.9 }
+  ]
 }

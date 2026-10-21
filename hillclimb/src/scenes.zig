@@ -133,7 +133,7 @@ fn springs(s: *State, c: *ui.Context) void {
         for (0..50) |col| {
             const n = r * 50 + col;
             const i: f32 = @floatFromInt(n);
-            ui.key(c, c.print("b{d}", .{n}));
+            ui.keyInt(c, n);
             const f = ui.motion.frame(c, .{
                 .target = .{
                     .y = 4 * @sin(t * 3 + i * 0.1),

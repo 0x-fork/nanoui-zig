@@ -48,6 +48,7 @@ pub const Glass = types.Glass;
 pub const Weight = types.Weight;
 
 pub const key = widgets.key;
+pub const keyInt = widgets.keyInt;
 pub const column = widgets.column;
 pub const row = widgets.row;
 pub const end = widgets.end;
@@ -91,6 +92,8 @@ pub const ListOptions = @import("list.zig").Options;
 pub const ListRows = @import("list.zig").Rows;
 pub const Tester = @import("tester.zig").Tester;
 pub const TesterOptions = @import("tester.zig").Options;
+/// Offscreen pixels a CPU window reuses (`canvas.zig`).
+pub const Canvas = @import("canvas.zig").Canvas;
 
 /// What a window of native UI shows: `build` runs on every frame.
 pub const View = struct {

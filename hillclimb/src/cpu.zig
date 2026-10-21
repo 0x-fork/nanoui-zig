@@ -14,6 +14,8 @@ pub fn run(gpa: std.mem.Allocator, scene: scenes.Scene, frames: usize) !main.Res
     try t.init(gpa, .init(&state, scenes.State.view), .{ .width = main.width, .height = main.height, .scale = main.scale });
     defer t.deinit();
     t.dt = 1.0 / 120.0;
+    var cv: ui.Canvas = .{};
+    defer cv.deinit(gpa);
 
     const frame_ms = try gpa.alloc(f64, frames);
     defer gpa.free(frame_ms);
@@ -32,8 +34,14 @@ pub fn run(gpa: std.mem.Allocator, scene: scenes.Scene, frames: usize) !main.Res
         t.frame();
         const ft = (ui.clock.now() - t0) * 1000;
         const t1 = ui.clock.now();
-        const px = try t.render(gpa);
-        px.deinit(gpa);
+        cv.draw(gpa, .{
+            .instances = t.instances.items,
+            .text = &t.text,
+            .clear = t.theme.background,
+            .size = t.size,
+            .scale = t.scale,
+            .textures = t.ctx.textures.items,
+        });
         const enc = (ui.clock.now() - t1) * 1000;
         if (i >= main.warmup) {
             frame_ms[i - main.warmup] = ft;
