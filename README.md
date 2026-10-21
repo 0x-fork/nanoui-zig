@@ -323,9 +323,9 @@ builds from any machine. On a Mac, `zig build -Dtarget=x86_64-linux-gnu` or
 
 | | macOS | Linux | Windows |
 |---|---|---|---|
-| windows, input, timers | AppKit | GTK 3 (loaded with `dlopen`) | Win32 |
+| windows, input, timers | AppKit | GTK 4, else GTK 3 (loaded with `dlopen`) | Win32 |
 | text | CoreText | nanoui's TrueType reader (`src/ui/tt/`) | the same |
-| rendering | Metal | CPU (`src/ui/raster.zig`), shown with cairo | CPU, shown with GDI |
+| rendering | Metal | CPU (`src/ui/raster.zig`), shown with cairo | CPU, shown by Direct3D 11 (a DXGI flip swap chain; GDI without it) |
 | icons | SF Symbols | line icons drawn by nanoui (`src/ui/icons.zig`) | the same |
 | pages (webview) | WKWebView | not yet | not yet |
 | menus | the menu bar | accelerators | accelerators |
@@ -333,7 +333,15 @@ builds from any machine. On a Mac, `zig build -Dtarget=x86_64-linux-gnu` or
 The CPU renderer matches the Metal one pixel for pixel, and a test compares
 them. `zig build test -Dportable=true` runs the Linux and Windows text and
 renderer on a Mac. Linux is also tested in a container
-(`tools/linux.Dockerfile`: GTK, fonts and a virtual display).
+(`tools/linux.Dockerfile`: GTK 3 and 4, fonts and a virtual display).
+
+On Linux nanoui loads GTK 4 when it's installed and GTK 3 otherwise;
+`NANOUI_GTK=3` asks for GTK 3. Both work the same: GTK 4's event
+controllers, draw function, clipboard and dialogs stand in for GTK 3's
+event signals and waiting calls (`src/linux/surface_gtk4.zig`). On Windows,
+frames reach the screen through a Direct3D 11 device (hardware, else WARP)
+and a flip-sequential swap chain, so resizing stays smooth and content
+stays anchored (`src/windows/d3d.zig`).
 
 ## Apps
 
