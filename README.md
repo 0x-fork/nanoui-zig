@@ -346,6 +346,22 @@ stays anchored (`src/windows/d3d.zig`).
 
 ### iOS
 
+<p align="center"><img src="docs/images/ios-gallery.gif" width="300" alt="The gallery example on an iPhone in the iOS Simulator: pages pushed from a list, buttons, toggles, a task list typed into, a 10 000-row list filtered, springs, and Liquid Glass"></p>
+
+The gallery on an iPhone ([MP4](docs/images/ios-gallery.mp4)). It's the same
+Zig view as on the Mac. When the window is narrow it shows its pages as a list
+and pushes each one in. The app played this itself:
+
+```sh
+xcrun simctl launch booted dev.nanoui.gallery "--nanoui-play=tap:Tasks;tap:Something to do;type:Record a demo;tap:Add"
+xcrun simctl io booted recordVideo demo.mov
+```
+
+`--nanoui-play` takes the same steps as `--nanoui-script` (tap, type, key,
+scroll, wait) and plays them in the running app at a person's pace, with a
+dot where each finger lands. It works on macOS too. The Simulator can record
+its screen but can't tap, so this is how you make demo videos.
+
 Native UI runs on iOS with the Mac's renderer and text, Metal and
 CoreText; `src/ios/` puts them on UIKit. The first window fills the
 screen, and windows shown after it cover it until they close or hide; a
