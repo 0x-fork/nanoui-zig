@@ -7,7 +7,6 @@ edition = "2021"
 slint = { version = "1.10", default-features = false, features = [
     "std",
     "compat-1-2",
-    "backend-winit-software",
+    "backend-winit-x11",
     "renderer-software",
-    "compat-1-0",
 ] }

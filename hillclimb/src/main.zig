@@ -55,6 +55,8 @@ const Options = struct {
     only: ?[]const u8 = null,
     scenes: []const scenes.Scene = std.enums.values(scenes.Scene),
     label: []const u8 = "",
+    /// 1 Y-sample CPU shadows (faster encode; does not match Metal).
+    cheap_shadow: bool = false,
 };
 
 pub fn cpuSeconds() f64 {
@@ -117,8 +119,10 @@ fn parseArgs(init: std.process.Init) !Options {
             while (it.next()) |name| try list.append(arena, std.meta.stringToEnum(scenes.Scene, name) orelse return error.UnknownScene);
             o.scenes = list.items;
             i += 1;
+        } else if (std.mem.eql(u8, a, "--cheap-shadow")) {
+            o.cheap_shadow = true;
         } else if (std.mem.eql(u8, a, "--help") or std.mem.eql(u8, a, "-h")) {
-            std.debug.print("usage: hillclimb [--scene boxes,text,scroll,list,dashboard,springs,letters] [--frames N] [--only nanoui|mygo|clay] [--label NAME]\n", .{});
+            std.debug.print("usage: hillclimb [--scene boxes,text,scroll,list,dashboard,springs,letters] [--frames N] [--only nanoui|mygo|clay] [--label NAME] [--cheap-shadow]\n", .{});
             std.process.exit(0);
         } else return error.UnknownArgument;
     }
@@ -129,6 +133,7 @@ pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const arena = init.arena.allocator();
     const opts = try parseArgs(init);
+    if (opts.cheap_shadow) ui.raster.shadows.samples = 1;
     const want = struct {
         fn f(o: Options, fw: []const u8) bool {
             return o.only == null or std.mem.eql(u8, o.only.?, fw);

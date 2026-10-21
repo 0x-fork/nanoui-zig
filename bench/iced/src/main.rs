@@ -3,9 +3,7 @@
 use std::time::{Duration, Instant};
 
 use iced::widget::{column, container, row, scrollable, text, Space};
-use iced::{
-    time, window, Color, Element, Length, Subscription, Task, Theme,
-};
+use iced::{time, Color, Element, Length, Subscription, Task, Theme};
 
 fn median(xs: &mut [f64]) -> f64 {
     xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -23,7 +21,6 @@ struct Bench {
     warmup: usize,
     measured: usize,
     times: Vec<f64>,
-    last: Option<Instant>,
 }
 
 impl Bench {
@@ -34,7 +31,6 @@ impl Bench {
             warmup: 30,
             measured: frames,
             times: Vec::with_capacity(frames),
-            last: None,
         }
     }
 
@@ -43,14 +39,14 @@ impl Bench {
     }
 
     fn update(&mut self, _: Message) -> Task<Message> {
-        let now = Instant::now();
-        if let Some(prev) = self.last {
-            if self.frame >= self.warmup && self.times.len() < self.measured {
-                self.times
-                    .push(now.duration_since(prev).as_secs_f64() * 1000.0);
-            }
+        // Time widget-tree build (layout/present are inside iced's window
+        // and are not hooked). Interval-between-ticks was ~0 and discarded.
+        let t0 = Instant::now();
+        let _ = self.view();
+        let ms = t0.elapsed().as_secs_f64() * 1000.0;
+        if self.frame >= self.warmup && self.times.len() < self.measured {
+            self.times.push(ms);
         }
-        self.last = Some(now);
         self.frame += 1;
         if self.times.len() >= self.measured {
             let mut times = std::mem::take(&mut self.times);
@@ -63,11 +59,12 @@ impl Bench {
                 _ => 0,
             };
             println!(
-                "{{\"framework\":\"iced\",\"scene\":\"{}\",\"frames\":{},\"frame_ms_p50\":{p50:.4},\"ops\":{ops},\"renderer\":\"tiny-skia\",\"present\":\"xvfb + iced tiny-skia (CPU)\"}}",
+                "{{\"framework\":\"iced\",\"scene\":\"{}\",\"frames\":{},\"frame_ms_p50\":{p50:.4},\"ops\":{ops},\"renderer\":\"tiny-skia\",\"present\":\"widget tree only (no present timestamp)\"}}",
                 self.scene,
                 self.measured
             );
-            return window::get_latest().and_then(window::close);
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+            std::process::exit(0);
         }
         Task::none()
     }

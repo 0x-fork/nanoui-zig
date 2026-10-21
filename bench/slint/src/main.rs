@@ -28,7 +28,7 @@ slint::slint! {
                     width: 24px;
                     height: 24px;
                     border-radius: 6px;
-                    y: 6px * sin(t * 3 + i * 0.1);
+                    y: 6px * sin((t * 3 + i * 0.1) * 1rad);
                     background: hsv(mod(t * 60 + i * 3, 360), 0.7, 0.85);
                     drop-shadow-blur: 4px;
                     drop-shadow-offset-y: 2px;
@@ -62,7 +62,7 @@ slint::slint! {
                     width: 14px;
                     height: 14px;
                     border-radius: 3px;
-                    y: 4px * sin(t * 3 + i * 0.1);
+                    y: 4px * sin((t * 3 + i * 0.1) * 1rad);
                     background: #508cdc;
                 }
             }
@@ -71,7 +71,7 @@ slint::slint! {
         if scene == "scroll": Flickable {
             width: 100%;
             height: 100%;
-            viewport-y: -mod(frame / 120.0 * 600, 28 * 1000 - 640) * 1px;
+            content-y: -mod(frame / 120.0 * 600, 28 * 1000 - 640) * 1px;
             VerticalLayout {
                 for i in 1000: HorizontalLayout {
                     height: 28px;

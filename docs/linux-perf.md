@@ -4,45 +4,60 @@ Headless measurements of nanoui on Linux against itself and other GUI
 frameworks. The JSON source of truth is `bench/frameworks.json`.
 
 Host: Ubuntu 24.04, x86_64, **no discrete GPU**. nanoui draws with
-`src/ui/raster.zig` through `ui.Tester` (offscreen, 900×640 at 2×). Mesa
-llvmpipe is installed; windowed GL was not measured. rustc 1.83.0.
+`src/ui/raster.zig` through `ui.Tester` (offscreen, 900×640 at 2×).
+rustc **1.99.1** (rustup stable). Mesa **lavapipe** (llvmpipe LLVM 20.1.2)
+is the Vulkan ICD under `xvfb-run`.
 
 ## Method
 
 Scenes: `boxes` (600 moving shadowed rects), `text`, `scroll`, `list`,
 `dashboard`, `springs` (2 000 `ui.motion` boxes), `letters`. 30 frames of
-warm-up, 20 measured, one or two repeats. A change is kept only if a
-scene improves by more than 3% and nothing important regresses by more
-than that.
+warm-up, 20 measured. A change is kept only if a scene improves by more
+than 3% and nothing important regresses by more than that.
 
-## Results (after climb)
+GPUI 0.2.2 is built with its Linux X11 + Blade backend. A window opens
+on Xvfb and `Window::draw` is timed (layout, prepaint, paint, scene).
+Blade **present hung** on lavapipe's vsync path, so GPU present is not in
+the GPUI times. `TestAppContext` (present discarded) is recorded too and
+matches the X11 draw times.
 
-| scene | nanoui frame p50 | nanoui encode | egui frame p50 | clay frame p50 |
-|---|---:|---:|---:|---:|
-| boxes | 0.074 ms | 24.0 ms | 0.107 ms | 0.064 ms |
-| text | 0.205 ms | 2.1 ms | 0.315 ms | — |
-| scroll | 0.510 ms | 2.0 ms | 1.431 ms | — |
-| list | 0.057 ms | 2.0 ms | — | — |
-| dashboard | 0.044 ms | 12.8 ms | — | — |
-| springs | 0.571 ms | 4.7 ms | 0.334 ms* | — |
-| letters | 0.081 ms | 0.71 ms | — | — |
+## Results (after climb, with GPUI)
 
-\* egui's "springs" scene is `sin()` offsets, not spring physics. nanoui
-solves a closed-form spring per channel.
+Frame CPU is build + layout + paint (nanoui `Tester.frame` / GPUI
+`Window::draw`). Encode is nanoui's CPU raster into pixels.
 
-nanoui **leads egui** on boxes, text and scroll (frame CPU). It trails
-egui on the springs *declaration* because it integrates 2 000 real
-springs. Clay is slightly ahead on boxes layout (0.064 vs 0.074) and
-draws nothing.
+| scene | nanoui frame | nanoui encode | GPUI frame (X11/Blade) | egui | iced tree | slint | clay |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| boxes | 0.074 ms | 24.0 ms | 1.444 ms | 0.107 | 0.072* | ≤1.05† | 0.064 |
+| text | 0.205 ms | 2.1 ms | 2.285 ms | 0.315 | 0.033* | 17.4 | — |
+| scroll | 0.510 ms | 2.0 ms | 14.601 ms | 1.431 | 0.377* | ≤1.14† | — |
+| list | 0.057 ms | 2.0 ms | 0.380 ms | — | — | — | — |
+| dashboard | 0.044 ms | 12.8 ms | 0.340 ms | — | — | — | — |
+| springs | 0.571 ms | 4.7 ms | 5.562 ms | 0.334‡ | 0.281*‡ | ≤1.04†‡ | — |
+| letters | 0.081 ms | 0.71 ms | 1.474 ms | — | — | — | — |
 
-CPU-raster **encode** is the Linux gap vs a GPU: Gaussian shadows on the
-boxes/dashboard scenes are ~12–24 ms. Frame CPU stays under 1 ms. A 60 Hz
-CPU window would drop on those two scenes; the OpenGL path (when a GPU
-or llvmpipe window is used) is the intended live path and was not timed
-here.
+\* iced times are widget-tree build only (no layout/present hook).
+† Slint 1 ms timer floor except text.
+‡ egui/iced/slint "springs" are `sin()` offsets. GPUI and nanoui solve
+the same closed-form spring (k=240, c=26, m=1).
 
-ReleaseFast binary: gallery 8.1 MB, counter 6.9 MB. Idle CPU is 0 (nothing
-polls).
+nanoui **leads GPUI on every scene's frame CPU** (about 10–30× on
+boxes/text/scroll/springs). It leads egui on boxes, text and scroll.
+Clay is still slightly ahead on boxes layout (0.064 vs 0.074) and draws
+nothing.
+
+The Linux gap vs a live GPUI window is **encode**, not the view tick:
+Gaussian shadows on boxes/dashboard are 13–24 ms on the CPU. GPUI's
+Blade present was not timed here (hung on lavapipe). A 60 Hz CPU window
+would drop on those two scenes; the OpenGL path is the intended live
+path when a GPU exists.
+
+`--cheap-shadow` (1 Y-sample instead of Metal's 4) cuts boxes encode
+24.0 → 13.5 ms (−44%) and dashboard 12.8 → 7.4 ms (−42%). It does
+**not** match the Metal raster tests; default stays 4.
+
+ReleaseFast binary: gallery 8.1 MB, counter 6.9 MB. Idle CPU is 0
+(nothing polls).
 
 ## Steps
 
@@ -72,23 +87,39 @@ second sample skipped the spring matrix.
 Channels of the same spring share a clock. The last closed-form
 solution is reused when stiffness, damping, mass and t match.
 
-Springs frame CPU: **0.807 → 0.571 ms (−29%)**. Further tries (shadow
-math, per-channel SIMD) were not taken: they risk the Metal-matching
-raster tests for <3% on the already-sub-millisecond frame path.
+Springs frame CPU: **0.807 → 0.571 ms (−29%)**.
+
+### 5. GPUI / iced / Slint (rustc 1.99.1)
+
+GPUI 0.2.2 builds. X11 window opens under Xvfb with the lavapipe ICD.
+`Window::draw` is 1.4–14.6 ms depending on the scene. Blade present
+never returned on lavapipe, so those times are scene build only.
+
+iced 0.13 and Slint 1.18 also build. iced exposes no per-draw hook
+(tree-only times). Slint's software renderer runs; a 1 ms timer floors
+most scenes.
+
+### 6. Cheap CPU shadow (flag, kept)
+
+`ui.raster.shadows.samples` defaults to 4 (Metal match).
+`hillclimb --cheap-shadow` sets 1. boxes encode **24.0 → 13.5 ms**.
+A 4-sample SIMD / interior-skip try did not beat 24 ms without
+breaking raster equality, so it was not kept on the default path.
 
 ## Skips
 
-GPUI, iced, Slint, Dioxus, Flutter, Qt Quick, GTK4 widgets, Tauri and
-Electron did not build here. Reasons are in `bench/frameworks.json`
-`skips`. The common blocker is Rust 1.85–1.87 / edition 2024 vs rustc
-1.83. mygo's twin is Metal-only.
+Dioxus, Flutter, Qt Quick, GTK4 widgets, Tauri, Electron, mygo: reasons
+in `bench/frameworks.json` `skips`. GPUI, iced and Slint are no longer
+skipped.
 
 ## Where nanoui still trails
 
-- **vs GPUI:** not measured (GPUI would not build). Expected live-path
-  gap is the CPU raster vs GPUI's GPU backend, not the view/layout tick.
+- **vs GPUI present:** not measured. Expected live-path gap is nanoui's
+  CPU Gaussian shadows (13–24 ms encode) vs GPUI's Blade GPU. Frame CPU
+  already leads.
 - **vs egui springs:** egui is not solving springs.
 - **vs Clay boxes:** Clay emits 600 flat commands and no shadows.
-- **CPU shadows:** boxes/dashboard encode 12–24 ms. A GPU (or a cheaper
-  CPU shadow) is the next climb, kept off this pass to protect raster
-  equality tests.
+- **vs Slint text:** Slint's 17 ms includes software present of a 300-
+  cell text grid; nanoui frame is 0.2 ms and encode 2.1 ms.
+- **CPU shadows:** default 4-sample encode still ~24 ms on boxes. A GPU
+  (OpenGL/llvmpipe window) or `--cheap-shadow` is the remaining climb.

@@ -94,6 +94,8 @@ pub const Tester = @import("tester.zig").Tester;
 pub const TesterOptions = @import("tester.zig").Options;
 /// Offscreen pixels a CPU window reuses (`canvas.zig`).
 pub const Canvas = @import("canvas.zig").Canvas;
+/// CPU raster (Linux/Windows). `raster.shadow_samples` is 4 to match Metal.
+pub const raster = @import("raster.zig");
 
 /// What a window of native UI shows: `build` runs on every frame.
 pub const View = struct {
@@ -136,6 +138,7 @@ test {
         _ = @import("tests_wrap.zig");
     }
     _ = @import("raster.zig");
+    _ = @import("raster_shadow.zig");
     _ = @import("tests_raster.zig");
     _ = @import("glass.zig");
     _ = @import("tests_glass.zig");

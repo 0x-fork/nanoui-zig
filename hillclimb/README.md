@@ -12,7 +12,12 @@ zig build run                                  # every scene, nanoui and mygo
 zig build run -- --label "what changed"        # name the run in history.jsonl
 zig build run -- --scene text,list --only nanoui --frames 600 --repeat 5
 zig build run -- --only clay                   # one framework (nanoui, mygo, clay)
+zig build run -- --cheap-shadow --scene boxes,dashboard --only nanoui
 ```
+
+`--cheap-shadow` uses one Y-sample for CPU Gaussian shadows (faster
+encode; does not match the Metal raster tests). Default is four, as
+`shader.metal`.
 
 Each scene runs 30 frames of warm-up, then 300 measured, three times; the
 run with the lowest median frame is kept. The table shows, per scene:
