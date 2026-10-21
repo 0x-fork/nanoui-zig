@@ -4,6 +4,7 @@
 //! Simulator records its screen but has no way to tap). macOS and iOS.
 //!
 //!   tap:TEXT      press the text drawn as TEXT, and let go (click:TEXT too)
+//!   tap:@X,Y      press the point X, Y (points; negative from the right or bottom edge)
 //!   move:TEXT     put the finger on it, for the scroll that follows
 //!   type:TEXT     type it, a character at a time
 //!   key:NAME      a key: enter, backspace, escape, tab, …
@@ -193,8 +194,15 @@ fn SurfaceOf(comptime App: type) type {
     return std.meta.Child(std.meta.Child(@FieldType(Window, "surface")));
 }
 
-/// The center of the text drawn as `str` in the last frame.
+/// The center of the text drawn as `str` in the last frame, or the point
+/// `@X,Y` (an icon, a map).
 fn find(s: anytype, str: []const u8) ?types.Point {
+    if (str.len > 1 and str[0] == '@') {
+        const comma = std.mem.indexOfScalar(u8, str, ',') orelse return null;
+        const x = std.fmt.parseFloat(f32, str[1..comma]) catch return null;
+        const y = std.fmt.parseFloat(f32, str[comma + 1 ..]) catch return null;
+        return .{ .x = if (x < 0) s.ctx.size.w + x else x, .y = if (y < 0) s.ctx.size.h + y else y };
+    }
     for (s.ctx.nodes.items) |n| switch (n.content) {
         .text => |tx| if (std.mem.eql(u8, tx.str, str)) return .{ .x = n.rect.x + n.rect.w / 2, .y = n.rect.y + n.rect.h / 2 },
         else => {},
