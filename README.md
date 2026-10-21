@@ -427,7 +427,10 @@ Chinese), keys repeating while held, and more than one window on an iPad.
       <a href="https://github.com/justrach/nanostudio"><img src="docs/images/nanostudio-dark.png" alt="nanostudio: the editor with a zoom on the timeline"></a>
       <p><a href="https://github.com/justrach/nanostudio"><strong>nanostudio</strong></a>: a screen recorder and editor. It records a display or a window with its sound, then zooms where you clicked. You can trim, speed up and dress the take, and export it. Every frame, preview and export alike, is a nanoui view.</p>
     </td>
-    <td width="50%" valign="top"></td>
+    <td width="50%" valign="top">
+      <a href="https://github.com/justrach/nanofly"><img src="docs/images/nanofly.png" alt="nanofly: Frankfurt to Los Angeles on the map, the flight's card under it" width="300"></a>
+      <p><a href="https://github.com/justrach/nanofly"><strong>nanofly</strong></a>: flights, live, on a map, for iPhone (and the Mac). It finds a flight's route, follows it from open ADS-B data, and says when it lands by each airport's clock. Its map is drawn by <code>ui.canvas</code>, from Natural Earth's land as triangles.</p>
+    </td>
   </tr>
 </table>
 
