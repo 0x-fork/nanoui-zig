@@ -1,8 +1,7 @@
 //! Same hill-climb scenes as `hillclimb/src/scenes.zig`, in GPUI.
 use gpui::{
-    Animation, AnimationExt as _, BoxShadow, Div, FontWeight, ScrollStrategy, SharedString,
-    StyledText, UniformListScrollHandle, div, ease_out_quint, hsla, point, prelude::*, px, rgb,
-    uniform_list,
+    BoxShadow, Div, FontWeight, ScrollStrategy, SharedString, StyledText,
+    UniformListScrollHandle, div, hsla, point, prelude::*, px, rgb, uniform_list,
 };
 
 pub const WIDTH: f32 = 900.0;
@@ -74,8 +73,8 @@ fn hsl(h: f32) -> gpui::Hsla {
     hsla(((h % 360.0) + 360.0) % 360.0 / 360.0, 0.7, 0.55, 1.0)
 }
 
-fn box_shadow(a: f32, blur: f32, y: f32) -> smallvec::SmallVec<[BoxShadow; 1]> {
-    smallvec::smallvec![BoxShadow {
+fn box_shadow(a: f32, blur: f32, y: f32) -> Vec<BoxShadow> {
+    vec![BoxShadow {
         color: hsla(0.0, 0.0, 0.0, a),
         offset: point(px(0.0), px(y)),
         blur_radius: px(blur),
@@ -332,17 +331,3 @@ fn letters(frame: usize) -> Div {
     col
 }
 
-#[allow(dead_code)]
-pub fn letters_animated(frame: usize) -> Div {
-    // Optional GPUI Animation wrapper; the timed path uses `letters`.
-    let _ = frame;
-    div().child(
-        div()
-            .with_animation(
-                "enter",
-                Animation::new(std::time::Duration::from_millis(250)).with_easing(ease_out_quint),
-                |this, delta| this.opacity(delta),
-            )
-            .child("nanoui"),
-    )
-}

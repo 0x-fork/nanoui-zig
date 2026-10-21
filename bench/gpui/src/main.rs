@@ -29,10 +29,63 @@ fn p95(xs: &mut [f64]) -> f64 {
 struct Bench {
     scene: Scene,
     frame: usize,
+    warmup: usize,
+    measured: usize,
+    times: Vec<f64>,
+    last: Option<Instant>,
+    done: bool,
+    /// When set, each render() requests another frame (Linux/Blade present).
+    live: bool,
+}
+
+impl Bench {
+    fn new(scene: Scene, frames: usize, live: bool) -> Self {
+        Self {
+            scene,
+            frame: 0,
+            warmup: 30,
+            measured: frames,
+            times: Vec::with_capacity(frames),
+            last: None,
+            done: false,
+            live,
+        }
+    }
+
+    fn tick_live(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let now = Instant::now();
+        if let Some(prev) = self.last {
+            if self.frame >= self.warmup && self.times.len() < self.measured {
+                self.times
+                    .push(now.duration_since(prev).as_secs_f64() * 1000.0);
+            }
+        }
+        self.last = Some(now);
+        self.frame += 1;
+        if self.times.len() < self.measured {
+            // X11's refresh timer skips a draw unless the window is dirty.
+            window.request_animation_frame();
+            cx.notify();
+        } else if !self.done {
+            self.done = true;
+            print_row(
+                self.scene,
+                self.measured,
+                &mut self.times,
+                "blade-vulkan",
+                &detect_present(),
+            );
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+            std::process::exit(0);
+        }
+    }
 }
 
 impl Render for Bench {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.live {
+            self.tick_live(window, cx);
+        }
         div()
             .size_full()
             .bg(rgb(0xf5f5f7))
@@ -52,7 +105,7 @@ fn print_row(scene: Scene, frames: usize, times: &mut [f64], renderer: &str, pre
 
 fn run_test(scene: Scene, frames: usize) {
     let mut cx = TestAppContext::single();
-    let (view, vcx) = cx.add_window_view(|_, _| Bench { scene, frame: 0 });
+    let (view, vcx) = cx.add_window_view(|_, _| Bench::new(scene, frames, false));
     vcx.simulate_resize(size(px(WIDTH), px(HEIGHT)));
     let warmup = 30;
     let mut times = vec![0.0; frames];
@@ -65,7 +118,7 @@ fn run_test(scene: Scene, frames: usize) {
         });
         let t0 = Instant::now();
         vcx.update(|window, cx| {
-            window.draw(cx);
+            let _ = window.draw(cx);
         });
         if i >= warmup {
             times[i - warmup] = t0.elapsed().as_secs_f64() * 1000.0;
@@ -81,7 +134,6 @@ fn run_test(scene: Scene, frames: usize) {
 }
 
 fn run_linux(scene: Scene, frames: usize) {
-    let present = detect_present();
     Application::new().run(move |cx| {
         let bounds = Bounds::centered(None, size(px(WIDTH), px(HEIGHT)), cx);
         let window = cx
@@ -92,31 +144,53 @@ fn run_linux(scene: Scene, frames: usize) {
                     show: true,
                     ..Default::default()
                 },
-                |_, cx| cx.new(|_| Bench { scene, frame: 0 }),
+                |_, cx| cx.new(|_| Bench::new(scene, frames, false)),
             )
             .expect("GPUI Linux window (need DISPLAY + Vulkan; use xvfb-run + lavapipe)");
+        eprintln!(
+            "gpui linux: X11 window open ({}); timing Window::draw (Blade present is not pumped: Xvfb vsync/present hung on lavapipe)",
+            detect_present()
+        );
         let warmup = 30;
         let mut times = vec![0.0; frames];
         for i in 0..warmup + frames {
-            let t0 = Instant::now();
             window
-                .update(cx, |view, win, cx| {
+                .update(cx, |view, _, cx| {
                     view.frame = i;
                     cx.notify();
-                    win.draw(cx);
                 })
-                .expect("update+draw");
+                .expect("update frame");
+            let t0 = Instant::now();
+            // Draw from the App, not from inside Entity::update — render()
+            // updates the root view and would otherwise nest.
+            cx.update_window(window.into(), |_, win, cx| {
+                let _ = win.draw(cx);
+            })
+            .expect("linux draw");
             if i >= warmup {
                 times[i - warmup] = t0.elapsed().as_secs_f64() * 1000.0;
             }
         }
-        print_row(scene, frames, &mut times, "blade-vulkan", &present);
-        cx.quit();
+        print_row(
+            scene,
+            frames,
+            &mut times,
+            "blade-x11",
+            &format!(
+                "{} — Window::draw on the real X11/Blade window; GPU present not included (lavapipe present hung)",
+                detect_present()
+            ),
+        );
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+        // X11/calloop quit() does not return under this Xvfb + lavapipe setup.
+        std::process::exit(0);
     });
 }
 
 fn detect_present() -> String {
-    let icd = std::env::var("VK_ICD_FILENAMES").unwrap_or_default();
+    let icd = std::env::var("VK_ICD_FILENAMES")
+        .or_else(|_| std::env::var("VK_DRIVER_FILES"))
+        .unwrap_or_default();
     let display = std::env::var("DISPLAY").unwrap_or_default();
     if icd.contains("lvp") || icd.contains("llvmpipe") {
         format!("xvfb/x11 + lavapipe (llvmpipe) DISPLAY={display}")
@@ -130,7 +204,8 @@ fn detect_present() -> String {
 fn vulkan_ready() -> bool {
     std::env::var_os("DISPLAY").is_some()
         && (std::path::Path::new("/usr/share/vulkan/icd.d/lvp_icd.json").exists()
-            || std::env::var_os("VK_ICD_FILENAMES").is_some())
+            || std::env::var_os("VK_ICD_FILENAMES").is_some()
+            || std::env::var_os("VK_DRIVER_FILES").is_some())
 }
 
 fn main() {
@@ -148,7 +223,7 @@ fn main() {
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(frames)
             }
-            other if !other.starts_with('-') => scene = other,
+            other if !other.starts_with('-') => scene = other.to_string(),
             _ => {}
         }
     }
