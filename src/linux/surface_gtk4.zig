@@ -11,10 +11,21 @@ const Surface = surface.Surface;
 
 /// Draws `s` in its window and feeds it GTK 4's input.
 pub fn attach(s: *Surface) void {
+    gtk.connect(s.im, "commit", @ptrCast(&onCommit), s);
+    attachArea(s);
+}
+
+/// Puts `s.area` in the window (replacing what was there), drawn and fed
+/// input: a GL area draws in "render" and starts OpenGL when realized; a
+/// drawing area through its draw function.
+pub fn attachArea(s: *Surface) void {
     const g4 = &gtk.v4api;
     const area = s.area;
     g4.gtk_widget_set_focusable(area, 1);
-    g4.gtk_drawing_area_set_draw_func(area, onDraw, s, null);
+    if (s.gl) {
+        gtk.connect(area, "render", @ptrCast(&onRender), s);
+        gtk.connect(area, "realize", @ptrCast(&onRealize), s);
+    } else g4.gtk_drawing_area_set_draw_func(area, onDraw, s, null);
     gtk.connect(area, "resize", @ptrCast(&onResize), s);
     const click = g4.gtk_gesture_click_new();
     g4.gtk_gesture_single_set_button(click, 1);
@@ -38,8 +49,15 @@ pub fn attach(s: *Surface) void {
     gtk.connect(focus, "leave", @ptrCast(&onFocusOut), s);
     g4.gtk_widget_add_controller(area, focus);
     g4.gtk_im_context_set_client_widget(s.im, area);
-    gtk.connect(s.im, "commit", @ptrCast(&onCommit), s);
     g4.gtk_window_set_child(s.window.gtkwindow.?, area);
+}
+
+fn onRealize(_: *gtk.Widget, data: ?*anyopaque) callconv(.c) void {
+    surface.glStart(of(data));
+}
+
+fn onRender(_: *gtk.Widget, _: *anyopaque, data: ?*anyopaque) callconv(.c) c_int {
+    return @intFromBool(surface.glRender(of(data)));
 }
 
 fn of(data: ?*anyopaque) *Surface {

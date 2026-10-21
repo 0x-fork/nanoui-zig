@@ -1,5 +1,6 @@
 //! A tour of the native UI toolkit: layout, text, every widget and motion,
-//! drawn by nanoui with Metal.
+//! drawn by nanoui (with Metal on macOS and iOS, OpenGL or its CPU renderer
+//! elsewhere).
 const std = @import("std");
 const nanoui = @import("nanoui");
 const ui = nanoui.ui;
@@ -62,7 +63,7 @@ const Gallery = struct {
         });
         defer ui.end(c);
         ui.text(c, "nanoui", .{ .size = 18, .weight = .bold });
-        ui.label(c, "Zig 0.17 · Metal");
+        ui.label(c, c.print("Zig 0.17 · {s}", .{c.renderer}));
         _ = c.leaf(.{ .height = .{ .px = 12 } }, .none, null);
         const pages = [_][2][]const u8{
             .{ "Controls", "slider.horizontal.3" },

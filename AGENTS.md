@@ -6,10 +6,11 @@ system webview (WKWebView, macOS only for now) with typed Zig ↔ TypeScript
 IPC, or native UI that nanoui draws itself, in the manner of GPUI: with Metal
 and CoreText on macOS; on Linux (GTK 3, loaded with dlopen) and Windows
 (Win32) with nanoui's own TrueType text (`src/ui/tt/`) and CPU renderer
-(`src/ui/raster.zig`, tested against Metal); on iOS (UIKit) with Metal and
-CoreText as on the Mac. Every platform builds from any machine
-(`-Dtarget=...`); iOS needs Xcode's SDK and Zig's lib fixed
-(`tools/ios/zig-lib.sh`).
+(`src/ui/raster.zig`, tested against Metal); on Linux, OpenGL 3.3 draws
+where there is a GPU (`src/ui/opengl.zig`, tested against the CPU
+renderer); on iOS (UIKit) with Metal and CoreText as on the Mac. Every
+platform builds from any machine (`-Dtarget=...`); iOS needs Xcode's SDK
+and Zig's lib fixed (`tools/ios/zig-lib.sh`).
 
 ## Hard rules
 
@@ -98,10 +99,13 @@ src/ui/text_tt.zig    text where nanoui shapes it itself (Linux, Windows)
 src/ui/tt/            TrueType: font files, the installed fonts, outlines to coverage
 src/ui/atlas_tt.zig   the glyph atlas in memory; icons.zig: line icons
 src/ui/raster.zig     the CPU renderer (same pixels as shader.metal)
+src/ui/canvas.zig     a CPU-drawn window's pixels: only what a frame changed is drawn
+src/ui/opengl.zig     the OpenGL 3.3 renderer (Linux); shader.glsl: both Metal shaders in GLSL
+src/ui/gl.zig         OpenGL's functions, loaded with dlopen
 src/ui/images.zig     pictures (ui.image): decoded once, packed in a BGRA atlas
 src/ui/png_decode.zig PNG to pixels where ImageIO isn't (Linux, Windows, portable)
 src/platform.zig      what differs by OS below the UI (event loop, clipboard)
-src/linux/            GTK 3 backend: app, window, surface, dialogs, fd watches
+src/linux/            GTK 3 backend: app, window, surface (GL area or CPU), dialogs, fd watches
 src/windows/          Win32 backend: app, window, surface, dialogs
 src/ios/              UIKit backend: app and scenes, windows as stacked screens,
                       surface (Metal view), touch (pointer, scrolling, flings),

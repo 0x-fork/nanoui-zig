@@ -325,13 +325,14 @@ builds from any machine (iOS from a Mac with Xcode, for its SDK). On a Mac, `zig
 |---|---|---|---|---|
 | windows, input, timers | AppKit | UIKit: screens over each other, touch, keyboards | GTK 4, else GTK 3 (loaded with `dlopen`) | Win32 |
 | text | CoreText | CoreText | nanoui's TrueType reader (`src/ui/tt/`) | the same |
-| rendering | Metal | Metal | CPU (`src/ui/raster.zig`), shown with cairo | CPU, shown by Direct3D 11 (a DXGI flip swap chain; GDI without it) |
+| rendering | Metal | Metal | OpenGL 3.3 in a GtkGLArea; CPU (`src/ui/raster.zig`) without one | CPU, shown by Direct3D 11 (a DXGI flip swap chain; GDI without it) |
 | icons | SF Symbols | SF Symbols | line icons drawn by nanoui (`src/ui/icons.zig`) | the same |
 | pages (webview) | WKWebView | not yet | not yet | not yet |
 | menus | the menu bar | a keyboard's shortcuts | accelerators | accelerators |
 
 The CPU renderer matches the Metal one pixel for pixel, and a test compares
-them. `zig build test -Dportable=true` runs the Linux and Windows text and
+them; another compares the OpenGL renderer with the CPU one, in a context
+without a window. `NANOUI_RENDERER=cpu` draws on the CPU where OpenGL is. `zig build test -Dportable=true` runs the Linux and Windows text and
 renderer on a Mac. Linux is also tested in a container
 (`tools/linux.Dockerfile`: GTK 3 and 4, fonts and a virtual display).
 

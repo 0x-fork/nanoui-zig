@@ -90,6 +90,7 @@ pub const Api3 = struct {
     gtk_window_iconify: *const fn (w: *Widget) callconv(.c) void,
     gtk_widget_show_all: *const fn (w: *Widget) callconv(.c) void,
     gtk_widget_hide: *const fn (w: *Widget) callconv(.c) void,
+    gtk_widget_queue_draw_area: *const fn (w: *Widget, x: c_int, y: c_int, width: c_int, height: c_int) callconv(.c) void,
     gtk_widget_destroy: *const fn (w: *Widget) callconv(.c) void,
     gtk_widget_add_events: *const fn (w: *Widget, mask: c_int) callconv(.c) void,
     gtk_widget_set_can_focus: *const fn (w: *Widget, on: c_int) callconv(.c) void,
