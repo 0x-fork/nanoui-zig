@@ -22,8 +22,19 @@ pub fn app(b: *std.Build, exe: *std.Build.Step.Compile, opts: Options) std.Build
     const dir = b.fmt("{s}.app", .{opts.name});
     const wf = b.addWriteFiles();
     _ = wf.add(b.fmt("{s}/Info.plist", .{dir}), infoPlist(b, exe.name, target, opts));
-    _ = wf.addCopyFile(exe.getEmittedBin(), b.fmt("{s}/{s}", .{ dir, exe.name }));
+    _ = wf.addCopyFile(stripped(b, exe), b.fmt("{s}/{s}", .{ dir, exe.name }));
     return wf.getDirectory().path(b, dir);
+}
+
+/// A release's executable without its local symbols (about a tenth of
+/// it), which Zig's linker keeps however it is asked; a debug build's as
+/// it is. Xcode's strip: any iOS build has Xcode for the SDK.
+fn stripped(b: *std.Build, exe: *std.Build.Step.Compile) std.Build.LazyPath {
+    if (exe.root_module.optimize.? == .debug) return exe.getEmittedBin();
+    const strip = b.addSystemCommand(&.{ "xcrun", "strip", "-x", "-o" });
+    const out = strip.addOutputFileArg(exe.name);
+    strip.addArtifactArg(exe);
+    return out;
 }
 
 /// Zig 0.17.0 has no libc of its own for iOS: without a libc file it links

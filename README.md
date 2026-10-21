@@ -361,7 +361,14 @@ clear itself with `ui.div(c).safeArea()`.
 ```sh
 zig build $(sh tools/ios/zig-lib.sh) -Dtarget=aarch64-ios-simulator               # zig-out/ios/Counter.app, Gallery.app
 zig build $(sh tools/ios/zig-lib.sh) run-gallery -Dtarget=aarch64-ios-simulator   # in the booted Simulator
+zig build $(sh tools/ios/zig-lib.sh) run-gallery -Dtarget=aarch64-ios-simulator --watch   # again on every save
 ```
+
+With `--watch`, each save builds the app, installs it and launches it
+again in the Simulator in a few seconds, its output in the same terminal.
+A release build (`-Doptimize=ReleaseSmall`) is stripped of its local
+symbols as it is bundled: the counter is about 300 KB, the gallery about
+500 KB, the renderer, text and widgets in them.
 
 You need Xcode for the iOS SDK. Zig 0.17.0's std can't build programs for
 iOS as it ships: it takes iOS for a system that can replace its process
