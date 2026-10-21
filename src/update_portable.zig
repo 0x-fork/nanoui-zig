@@ -67,8 +67,9 @@ pub fn fetch(u: *Updater, a: std.mem.Allocator) !bool {
     const updates = try std.fs.path.join(a, &.{ u.cache, "updates" });
     const manifest = try run(a, u.io, &.{ curl, "-fsSL", "--max-time", "30", try std.fmt.allocPrint(a, "{s}/manifest.json", .{u.feed}) });
     const release = try update.parseManifest(a, manifest, u.options.asset);
-    if (!update.newer(release.version, u.current)) {
-        std.Io.Dir.cwd().deleteTree(u.io, updates) catch {};
+    if (!update.newer(release.version, u.baseline())) {
+        // Nothing waits: what an older check left goes.
+        if (u.phase.load(.acquire) != .ready) std.Io.Dir.cwd().deleteTree(u.io, updates) catch {};
         return false;
     }
     const dir = try std.fs.path.join(a, &.{ updates, release.version });
@@ -94,11 +95,7 @@ pub fn fetch(u: *Updater, a: std.mem.Allocator) !bool {
     const said = try run(a, u.io, &.{ staged, "--version" });
     if (std.mem.indexOf(u8, said, release.version) == null) return error.WrongVersion;
 
-    if (staged.len > u.staged_buf.len) return error.NameTooLong;
-    @memcpy(u.staged_buf[0..staged.len], staged);
-    u.staged_len = staged.len;
-    @memcpy(u.version_buf[0..release.version.len], release.version);
-    u.version_len = release.version.len;
+    try u.stage(release.version, staged);
     return true;
 }
 
@@ -242,6 +239,7 @@ test "an update from a feed: found, checked, unpacked, run, installed" {
 
     var u: Updater = .{ .gpa = gpa, .io = io, .options = .{ .repo = "me/app", .asset = "app-linux.tar.gz", .name = "app", .version = "0.1.0" }, .feed = "file://" ++ root ++ "/feed", .bundle = root ++ "/bin/app", .current = "0.1.0", .cache = root ++ "/cache" };
     try std.testing.expect(try fetch(&u, a));
+    u.adopt();
     try std.testing.expectEqualStrings("0.2.0", u.version_buf[0..u.version_len]);
     try install(&u);
     try std.testing.expectEqualStrings("app 0.2.0\n", try run(a, io, &.{ root ++ "/bin/app", "--version" }));
@@ -251,4 +249,53 @@ test "an update from a feed: found, checked, unpacked, run, installed" {
     // A wrong sum is refused.
     try cwd.writeFile(io, .{ .sub_path = root ++ "/feed/manifest.json", .data = "{\"version\":\"0.3.0\",\"files\":{\"app-linux.tar.gz\":{\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\"}}}" });
     try std.testing.expectError(error.ChecksumMismatch, fetch(&u, a));
+}
+
+/// A release of `version` in `root`/feed: the app's archive and the manifest.
+fn makeRelease(a: std.mem.Allocator, io: std.Io, root: []const u8, version: []const u8) !void {
+    const cwd = std.Io.Dir.cwd();
+    const folder = try std.fmt.allocPrint(a, "{s}/pack/app-{s}-linux-x86_64", .{ root, version });
+    try cwd.createDirPath(io, folder);
+    try cwd.writeFile(io, .{ .sub_path = try std.fmt.allocPrint(a, "{s}/app", .{folder}), .data = try std.fmt.allocPrint(a, "#!/bin/sh\necho \"app {s}\"\n", .{version}), .flags = .{ .permissions = .fromMode(0o755) } });
+    try cwd.createDirPath(io, try std.fmt.allocPrint(a, "{s}/feed", .{root}));
+    const archive = try std.fmt.allocPrint(a, "{s}/feed/app-linux.tar.gz", .{root});
+    _ = try run(a, io, &.{ tar, "-czf", archive, "-C", try std.fmt.allocPrint(a, "{s}/pack", .{root}), std.fs.path.basename(folder) });
+    const bytes = try cwd.readFileAlloc(io, archive, a, .limited(1 << 20));
+    var digest: [32]u8 = undefined;
+    std.crypto.hash.sha2.Sha256.hash(bytes, &digest, .{});
+    try cwd.writeFile(io, .{ .sub_path = try std.fmt.allocPrint(a, "{s}/feed/manifest.json", .{root}), .data = try std.fmt.allocPrint(a, "{{\"version\":\"{s}\",\"files\":{{\"app-linux.tar.gz\":{{\"sha256\":\"{s}\"}}}}}}", .{ version, std.fmt.bytesToHex(digest, .lower) }) });
+}
+
+test "a newer release while one waits takes its place; the same one isn't fetched again" {
+    if (windows) return error.SkipZigTest; // the fake program is a shell script
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
+    const cwd = std.Io.Dir.cwd();
+    const root = "/tmp/nanoui-test-portable-newer";
+    cwd.deleteTree(io, root) catch {};
+    defer cwd.deleteTree(io, root) catch {};
+    var arena_state: std.heap.ArenaAllocator = .init(gpa);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    try cwd.createDirPath(io, root ++ "/bin");
+    try cwd.writeFile(io, .{ .sub_path = root ++ "/bin/app", .data = "#!/bin/sh\necho \"app 0.1.0\"\n", .flags = .{ .permissions = .fromMode(0o755) } });
+    var u: Updater = .{ .gpa = gpa, .io = io, .options = .{ .repo = "me/app", .asset = "app-linux.tar.gz", .name = "app", .version = "0.1.0" }, .feed = "file://" ++ root ++ "/feed", .bundle = root ++ "/bin/app", .current = "0.1.0", .cache = root ++ "/cache" };
+    // 0.2.0 comes and waits (the app isn't restarted).
+    try makeRelease(a, io, root, "0.2.0");
+    try std.testing.expect(try fetch(&u, a));
+    u.adopt();
+    try std.testing.expectEqualStrings("0.2.0", u.ready().?);
+    // 0.3.0 comes: fetched beside it, then waits in its place; 0.2.0's files go.
+    try makeRelease(a, io, root, "0.3.0");
+    try std.testing.expect(try fetch(&u, a));
+    try std.testing.expectEqualStrings("0.2.0", u.ready().?); // until adopted, on the main thread
+    u.adopt();
+    try std.testing.expectEqualStrings("0.3.0", u.ready().?);
+    try std.testing.expectError(error.FileNotFound, cwd.access(io, root ++ "/cache/updates/0.2.0", .{}));
+    // Still the latest: nothing fetched, and what waits stays.
+    try std.testing.expect(!try fetch(&u, a));
+    try cwd.access(io, root ++ "/cache/updates/0.3.0", .{});
+    // Restarting installs the newest.
+    try install(&u);
+    try std.testing.expectEqualStrings("app 0.3.0\n", try run(a, io, &.{ root ++ "/bin/app", "--version" }));
 }

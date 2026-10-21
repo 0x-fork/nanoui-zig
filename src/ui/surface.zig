@@ -43,6 +43,10 @@ pub const Surface = struct {
     /// A frame was wanted while the window was hidden: run it once visible.
     pending: bool = false,
     dead: bool = false,
+    /// The window is being resized: only its size changes draw (each in the
+    /// window's transaction); the link waits, and what else asks for a
+    /// frame (output, an animation) gets the resize's next one.
+    resizing: bool = false,
     cursor: ctx_mod.Cursor = .arrow,
     theme_override: ?Theme = null,
 
@@ -185,7 +189,10 @@ pub const Surface = struct {
         self.updateCursor();
         // Something moved under a still pointer, or a value is animating.
         const more = c.animating or r.hot_changed;
-        if (self.display_link != null) {
+        if (self.resizing) {
+            // The resize's next step draws again; its end catches up.
+            self.setPaced(false);
+        } else if (self.display_link != null) {
             // Something changes now and then: the link, at that pace.
             self.setRate(if (more) null else c.frame_in);
             self.setPaced(more or c.frame_in != null);
@@ -196,6 +203,7 @@ pub const Surface = struct {
     /// Draws a frame at the display's next refresh: for changes from
     /// outside the view (a process's output, a network reply).
     pub fn requestFrame(self: *Surface) void {
+        if (self.resizing) return;
         if (self.display_link != null) {
             self.setRate(null);
             self.setPaced(true);
@@ -471,19 +479,26 @@ fn paste(obj: objc.Object, _: objc.SEL, _: ?objc.Object) callconv(.c) void {
 
 fn displayLinkFired(obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) void {
     const s = surfaceOf(obj) orelse return;
+    // While resizing, the resize draws: a frame of the link's would take
+    // a drawable its next step waits for.
+    if (s.resizing) return s.setPaced(false);
     s.frame();
 }
 
 fn liveResizeStart(obj: objc.Object, _: objc.SEL) callconv(.c) void {
     objc.msgSuper(void, obj, objc.class("NSView"), "viewWillStartLiveResize", .{});
     const s = surfaceOf(obj) orelse return;
+    s.resizing = true;
+    s.setPaced(false);
     s.renderer.setLiveResize(true);
 }
 
 fn liveResizeEnd(obj: objc.Object, _: objc.SEL) callconv(.c) void {
     objc.msgSuper(void, obj, objc.class("NSView"), "viewDidEndLiveResize", .{});
     const s = surfaceOf(obj) orelse return;
+    s.resizing = false;
     s.renderer.setLiveResize(false);
+    // What changed meanwhile, and the link's pace again.
     s.frame();
 }
 

@@ -195,6 +195,10 @@ pub const Renderer = struct {
     pub fn setLiveResize(self: *Renderer, on: bool) void {
         self.live_resize = on;
         objc.msg(void, self.layer, "setPresentsWithTransaction:", .{on});
+        // A frame presented in the window's transaction stays the
+        // compositor's until the next: with two drawables, each step of a
+        // resize would wait a refresh for one. A third while resizing.
+        objc.msg(void, self.layer, "setMaximumDrawableCount:", .{@as(objc.NSUInteger, if (on) 3 else 2)});
     }
 
     /// A render target of `size` points at `scale`, kept by the caller

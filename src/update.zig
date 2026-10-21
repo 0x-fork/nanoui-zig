@@ -7,7 +7,10 @@
 //! When it names a newer version, the zipped app is downloaded into the
 //! app's cache, checked against its sha256, unpacked, and kept only if
 //! its signature holds and is the running app's own team's. The app then
-//! offers "Restart to update" (`restart`). If the user quits instead, the
+//! offers "Restart to update" (`restart`). It goes on checking: a release
+//! newer still, while one waits, is fetched the same way and takes the
+//! waiting one's place, so an app left open for days restarts into the
+//! latest. If the user quits instead, the
 //! new bundle takes the old one's place as the app ends (`deinit`), and the
 //! next launch runs it.
 //!
@@ -52,7 +55,7 @@ pub const Phase = enum(u8) {
     /// This build can't update itself.
     off,
     idle,
-    /// A thread is checking or downloading.
+    /// No longer set: a check runs beside any phase (`Updater.checking`).
     busy,
     /// A newer version is unpacked and verified: `restart` installs it.
     ready,
@@ -71,12 +74,18 @@ pub const Updater = struct {
     bundle: []const u8 = "",
     current: []const u8 = "",
     cache: []const u8 = "",
-    /// The newer version and its unpacked bundle, written by the thread
-    /// before it publishes `ready`.
+    /// The newer version waiting and its unpacked bundle (main thread's).
     version_buf: [32]u8 = undefined,
     version_len: usize = 0,
     staged_buf: [1024]u8 = undefined,
     staged_len: usize = 0,
+    /// A check's thread is at work: it writes the version it fetched here,
+    /// and the main thread adopts it (`adopt`).
+    working: std.atomic.Value(bool) = .init(false),
+    next_version_buf: [32]u8 = undefined,
+    next_version_len: usize = 0,
+    next_staged_buf: [1024]u8 = undefined,
+    next_staged_len: usize = 0,
 
     /// Starts checking, if this build can update itself. Call from `main`,
     /// on the main thread; `deinit` before the app ends.
@@ -92,12 +101,17 @@ pub const Updater = struct {
     /// Installs a version still waiting, for the next launch, and frees
     /// the updater (unless its thread is still at work: the app is ending).
     pub fn deinit(u: *Updater) void {
+        if (u.working.load(.acquire)) return;
         switch (u.phase.load(.acquire)) {
-            .busy => return,
             .ready => u.install() catch |e| std.log.info("nanoui: update not installed: {t}", .{e}),
             else => {},
         }
         u.free();
+    }
+
+    /// A check is running (it may find a version newer than one waiting).
+    pub fn checking(u: *const Updater) bool {
+        return u.working.load(.acquire);
     }
 
     /// The newer version that's ready to install, if one is.
@@ -106,14 +120,50 @@ pub const Updater = struct {
         return u.version_buf[0..u.version_len];
     }
 
-    /// Checks now (a menu's "Check for Updates"), unless a check is running.
+    /// Checks now (a menu's "Check for Updates"), unless a check is
+    /// running; with a version waiting, for one newer still.
     pub fn checkNow(u: *Updater) void {
-        if (u.phase.cmpxchgStrong(.idle, .busy, .acq_rel, .acquire) != null) return;
+        switch (u.phase.load(.acquire)) {
+            .off, .installed => return,
+            else => {},
+        }
+        if (u.working.swap(true, .acq_rel)) return;
         const t = std.Thread.spawn(.{}, work, .{u}) catch {
-            u.phase.store(.idle, .release);
+            u.working.store(false, .release);
             return;
         };
         t.detach();
+    }
+
+    /// What a release must be newer than: the version waiting, else the
+    /// running one.
+    pub fn baseline(u: *const Updater) []const u8 {
+        return if (u.phase.load(.acquire) == .ready) u.version_buf[0..u.version_len] else u.current;
+    }
+
+    /// From the check's thread: `version`, unpacked at `staged`, to adopt.
+    pub fn stage(u: *Updater, version: []const u8, staged: []const u8) !void {
+        if (staged.len > u.next_staged_buf.len or version.len > u.next_version_buf.len) return error.NameTooLong;
+        @memcpy(u.next_staged_buf[0..staged.len], staged);
+        u.next_staged_len = staged.len;
+        @memcpy(u.next_version_buf[0..version.len], version);
+        u.next_version_len = version.len;
+    }
+
+    /// On the main thread: the version a check staged waits now, in place of
+    /// one that waited before (whose files go).
+    pub fn adopt(u: *Updater) void {
+        if (u.phase.load(.acquire) == .ready) {
+            var buf: [1024]u8 = undefined;
+            if (std.fmt.bufPrint(&buf, "{s}{c}updates{c}{s}", .{ u.cache, std.fs.path.sep, std.fs.path.sep, u.version_buf[0..u.version_len] })) |old| {
+                std.Io.Dir.cwd().deleteTree(u.io, old) catch {};
+            } else |_| {}
+        }
+        @memcpy(u.version_buf[0..u.next_version_len], u.next_version_buf[0..u.next_version_len]);
+        u.version_len = u.next_version_len;
+        @memcpy(u.staged_buf[0..u.next_staged_len], u.next_staged_buf[0..u.next_staged_len]);
+        u.staged_len = u.next_staged_len;
+        u.phase.store(.ready, .release);
     }
 
     /// Installs the ready version and opens it once this process is gone.
@@ -153,11 +203,9 @@ pub const Updater = struct {
 
     fn tick(ctx: ?*anyopaque) callconv(.c) void {
         const u: *Updater = @ptrCast(@alignCast(ctx));
-        // Once installed or waiting, there's nothing more to look for.
-        switch (u.phase.load(.acquire)) {
-            .ready, .installed => return,
-            else => {},
-        }
+        // Once installed, there's nothing more to look for; while one
+        // waits, a newer one may come.
+        if (u.phase.load(.acquire) == .installed) return;
         u.checkNow();
         App.after(u.options.every_ms, u, tick);
     }
@@ -169,12 +217,13 @@ pub const Updater = struct {
             std.log.info("nanoui: no update: {t}", .{e});
             break :blk false;
         };
-        u.phase.store(if (got) .ready else .idle, .release);
-        if (got) App.onMain(u, changed);
+        if (got) App.onMain(u, adopted) else u.working.store(false, .release);
     }
 
-    fn changed(ctx: ?*anyopaque) callconv(.c) void {
+    fn adopted(ctx: ?*anyopaque) callconv(.c) void {
         const u: *Updater = @ptrCast(@alignCast(ctx));
+        u.adopt();
+        u.working.store(false, .release);
         if (u.options.changed) |cb| cb.func(cb.ctx);
     }
 
@@ -184,8 +233,9 @@ pub const Updater = struct {
         const updates = try std.fs.path.join(a, &.{ u.cache, "updates" });
         const manifest = try run(a, u.io, &.{ "/usr/bin/curl", "-fsSL", "--max-time", "30", try url(a, u.feed, "manifest.json") });
         const release = try parseManifest(a, manifest, u.options.asset);
-        if (!newer(release.version, u.current)) {
-            std.Io.Dir.cwd().deleteTree(u.io, updates) catch {};
+        if (!newer(release.version, u.baseline())) {
+            // Nothing waits: what an older check left goes.
+            if (u.phase.load(.acquire) != .ready) std.Io.Dir.cwd().deleteTree(u.io, updates) catch {};
             return false;
         }
         const team = parseTeam(try runErr(a, u.io, &.{ "/usr/bin/codesign", "-dv", "--verbose=2", u.bundle })) orelse return error.Unsigned;
@@ -217,11 +267,7 @@ pub const Updater = struct {
         const v = try run(a, u.io, &.{ "/usr/bin/plutil", "-extract", "CFBundleShortVersionString", "raw", "-o", "-", plist });
         if (!std.mem.eql(u8, std.mem.trim(u8, v, " \n"), release.version)) return error.WrongVersion;
 
-        if (staged.len > u.staged_buf.len) return error.NameTooLong;
-        @memcpy(u.staged_buf[0..staged.len], staged);
-        u.staged_len = staged.len;
-        @memcpy(u.version_buf[0..release.version.len], release.version);
-        u.version_len = release.version.len;
+        try u.stage(release.version, staged);
         return true;
     }
 
