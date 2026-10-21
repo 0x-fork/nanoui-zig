@@ -8,6 +8,8 @@
 //!   --nanoui-wait=SECONDS    with --nanoui-snapshot: run the event loop that long first, so
 //!                            processes, timers and replies the app waits for arrive
 //!   --nanoui-hidden          never show windows
+//!   --nanoui-play=STEPS      play steps in the first window as it runs, for recordings
+//!                            (macOS, iOS; see play.zig)
 //!   --nanoui-eval=JS         evaluate JS in each page once its DOM is ready (implies hidden);
 //!                            pages report with nanoui.log() and finish with nanoui.window.close()
 const std = @import("std");
@@ -21,6 +23,7 @@ pub const Flags = struct {
     dark: bool = false,
     hidden: bool = false,
     eval: ?[]const u8 = null,
+    play: ?[]const u8 = null,
     wait: f64 = 0,
 
     pub fn parse(init: std.process.Init) !Flags {
@@ -32,6 +35,7 @@ pub const Flags = struct {
             if (value(arg, "--nanoui-snapshot=")) |v| f.snapshot = try arena.dupe(u8, v);
             if (value(arg, "--nanoui-script=")) |v| f.script = try arena.dupe(u8, v);
             if (value(arg, "--nanoui-eval=")) |v| f.eval = try arena.dupe(u8, v);
+            if (value(arg, "--nanoui-play=")) |v| f.play = try arena.dupe(u8, v);
             if (value(arg, "--nanoui-wait=")) |v| f.wait = std.fmt.parseFloat(f64, v) catch 0;
             if (std.mem.eql(u8, arg, "--nanoui-dark")) f.dark = true;
             if (std.mem.eql(u8, arg, "--nanoui-hidden")) f.hidden = true;
