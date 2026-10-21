@@ -25,9 +25,9 @@ pub const Shortcut = struct {
     pub const tab: u21 = '\t';
     pub const enter: u21 = '\r';
 
-    /// As this platform has it: Command is Control off macOS.
+    /// As this platform has it: Command is Control off Apple's systems.
     pub fn native(s: Shortcut) Shortcut {
-        if (@import("builtin").os.tag == .macos or !s.cmd) return s;
+        if (@import("keys.zig").mac or !s.cmd) return s;
         var n = s;
         n.cmd = false;
         n.ctrl = true;
@@ -167,7 +167,7 @@ pub const Input = struct {
     /// The key that adds to a selection with a click: Command on the
     /// Mac, Control elsewhere.
     pub fn adding(i: Input) bool {
-        return if (comptime @import("builtin").os.tag == .macos) i.cmd else i.ctrl;
+        return if (comptime @import("keys.zig").mac) i.cmd else i.ctrl;
     }
 
     pub fn clearEdges(i: *Input) void {

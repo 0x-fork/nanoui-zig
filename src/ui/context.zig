@@ -188,6 +188,12 @@ pub const Context = struct {
     /// its empty space moves the window, as a title bar does: a view with
     /// a toolbar there makes it the toolbar's height.
     title_bar_height: f32 = 28,
+    /// The window's edges the system draws over, in points: on iOS the
+    /// status bar, the home indicator, the screen's corners and the
+    /// keyboard. Zero on the desktop, and in an iOS window that isn't
+    /// `full_bleed` (laid out inside it already). `ui.div(c).safeArea()`
+    /// pads by it.
+    safe_area: types.Edges = .{},
     /// Set by a view that follows the pointer inside one box (a graph's
     /// column under it, a crosshair): every move draws a frame while it is
     /// set, not only moves onto another box. Cleared each frame.

@@ -1,5 +1,5 @@
 //! Pictures the UI shows (`ui.image`): decoded once from the bytes the app
-//! gives (ImageIO on macOS, nanoui's PNG decoder elsewhere), scaled to at
+//! gives (ImageIO on macOS and iOS, nanoui's PNG decoder elsewhere), scaled to at
 //! most `max_side` pixels, and packed into one BGRA atlas the renderers
 //! sample (premultiplied). Made on the first picture; when full, emptied
 //! and packed again, and the frame painted again.
@@ -8,7 +8,7 @@ const builtin = @import("builtin");
 const build_options = @import("build_options");
 const png_decode = @import("png_decode.zig");
 
-const portable = build_options.portable or builtin.os.tag != .macos;
+const portable = build_options.portable or !(builtin.os.tag == .macos or builtin.os.tag == .ios);
 const imageio = if (portable) void else @import("image.zig");
 
 pub const size: u32 = 2048;

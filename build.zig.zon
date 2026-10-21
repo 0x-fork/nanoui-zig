@@ -8,5 +8,7 @@
         "build.zig",
         "build.zig.zon",
         "src",
+        // build.zig imports tools/ios/bundle.zig; apps run sim.sh and zig-lib.sh.
+        "tools/ios",
     },
 }

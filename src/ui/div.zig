@@ -67,6 +67,12 @@ pub const Div = struct {
         d.style().padding.right = v;
         return d;
     }
+    /// Sets the padding to the safe area (`Context.safe_area`), keeping
+    /// content clear of what the system draws over the window: zero on
+    /// the desktop. It replaces the padding set before, as `p` does.
+    pub fn safeArea(d: Div) Div {
+        return d.set("padding", d.c.safe_area);
+    }
 
     // Size.
     pub fn w(d: Div, v: f32) Div {

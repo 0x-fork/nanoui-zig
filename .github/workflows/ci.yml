@@ -1,7 +1,7 @@
 # Tests nanoui on every push to main and every pull request: the line
 # limit, the unit and widget tests on macOS (Metal, and nanoui's own text
-# and CPU renderer), the Linux tests under a virtual display, and the
-# Windows tests on Windows.
+# and CPU renderer) with builds for Windows and iOS, the Linux tests under
+# a virtual display, and the Windows tests on Windows.
 name: CI
 
 on:
@@ -31,6 +31,9 @@ jobs:
           nui="$PWD/zig-out/bin/nui"
           "$nui" start ci-app --dir "$RUNNER_TEMP/ci-app" --local "$PWD"
           cd "$RUNNER_TEMP/ci-app" && "$nui" test && "$nui" snapshot --out shot.png --script "click:Increment" --json
+      # iOS needs Zig's lib fixed (the flag goes first) and Xcode's SDKs.
+      - run: zig build $(sh tools/ios/zig-lib.sh) -Dtarget=aarch64-ios-simulator --prefix zig-out/ios-sim
+      - run: zig build $(sh tools/ios/zig-lib.sh) -Dtarget=aarch64-ios --prefix zig-out/ios
 
   linux:
     runs-on: ubuntu-24.04

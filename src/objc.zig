@@ -6,6 +6,12 @@
 //! functions, routed back to Zig objects through one pointer ivar.
 const std = @import("std");
 
+/// UIKit (iOS), not AppKit: the few classes the shared Apple code names
+/// differ (`UIFont` for `NSFont`, `UIImage` for `NSImage`).
+pub const uikit = @import("builtin").os.tag == .ios;
+/// The system font class, toll-free bridged with CTFont on both.
+pub const font_class: [:0]const u8 = if (uikit) "UIFont" else "NSFont";
+
 pub const Object = *opaque {};
 pub const SEL = *opaque {};
 pub const Class = *opaque {};

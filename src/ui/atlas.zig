@@ -10,6 +10,8 @@ extern "c" fn CTFontGetBoundingRectsForGlyphs(font: cf.CTFontRef, orientation: u
 extern "c" fn CTFontDrawGlyphs(font: cf.CTFontRef, glyphs: [*]const u16, positions: [*]const objc.CGPoint, count: usize, ctx: cf.CGContextRef) void;
 extern "c" fn CGContextDrawImage(ctx: cf.CGContextRef, rect: objc.CGRect, image: *anyopaque) void;
 extern "c" fn CGContextTranslateCTM(ctx: cf.CGContextRef, tx: f64, ty: f64) void;
+extern "c" fn UIGraphicsPushContext(ctx: cf.CGContextRef) void;
+extern "c" fn UIGraphicsPopContext() void;
 
 /// The atlas starts small and doubles when full, up to `max_size`.
 const initial_size: u32 = 512;
@@ -169,15 +171,7 @@ pub const Atlas = struct {
     fn rasterizeSymbol(a: *Atlas, name: []const u8, point_size: f32, weight: u8) ?Sprite {
         const pool = objc.Pool.push();
         defer pool.pop();
-        const base = objc.msg(?objc.Object, objc.class("NSImage"), "imageWithSystemSymbolName:accessibilityDescription:", .{
-            objc.nsString(name), @as(?objc.Object, null),
-        }) orelse return null;
-        // NSFontWeight: regular, medium, semibold, bold.
-        const weights = [_]f64{ 0, 0.23, 0.3, 0.4 };
-        const config = objc.msg(objc.Object, objc.class("NSImageSymbolConfiguration"), "configurationWithPointSize:weight:", .{
-            @as(f64, point_size), weights[@min(weight, 3)],
-        });
-        const img = objc.msg(?objc.Object, base, "imageWithSymbolConfiguration:", .{config}) orelse return null;
+        const img = symbolImage(name, point_size, weight) orelse return null;
         const sz = objc.msg(objc.CGSize, img, "size", .{});
         if (sz.width <= 0 or sz.height <= 0) return null;
         const scale = a.scale;
@@ -201,11 +195,20 @@ pub const Atlas = struct {
         defer cf.CGColorSpaceRelease(space);
         const ctx = cf.CGBitmapContextCreate(rgba.ptr, bw, bh, 8, bw * 4, space, 2 | (2 << 12)) orelse return null;
         defer cf.CGContextRelease(ctx);
-        const gc = objc.msg(objc.Object, objc.class("NSGraphicsContext"), "graphicsContextWithCGContext:flipped:", .{ @as(*anyopaque, ctx), objc.NO });
-        objc.msg(void, objc.class("NSGraphicsContext"), "saveGraphicsState", .{});
-        objc.msg(void, objc.class("NSGraphicsContext"), "setCurrentContext:", .{gc});
-        objc.msg(void, img, "drawInRect:fromRect:operation:fraction:", .{ rect, objc.CGRect{}, @as(objc.NSUInteger, 2), @as(f64, 1) });
-        objc.msg(void, objc.class("NSGraphicsContext"), "restoreGraphicsState", .{});
+        if (objc.uikit) {
+            // UIKit draws top down: flip the bitmap's coordinates to its own.
+            CGContextTranslateCTM(ctx, 0, @floatFromInt(bh));
+            cf.CGContextScaleCTM(ctx, 1, -1);
+            UIGraphicsPushContext(ctx);
+            objc.msg(void, img, "drawInRect:", .{rect});
+            UIGraphicsPopContext();
+        } else {
+            const gc = objc.msg(objc.Object, objc.class("NSGraphicsContext"), "graphicsContextWithCGContext:flipped:", .{ @as(*anyopaque, ctx), objc.NO });
+            objc.msg(void, objc.class("NSGraphicsContext"), "saveGraphicsState", .{});
+            objc.msg(void, objc.class("NSGraphicsContext"), "setCurrentContext:", .{gc});
+            objc.msg(void, img, "drawInRect:fromRect:operation:fraction:", .{ rect, objc.CGRect{}, @as(objc.NSUInteger, 2), @as(f64, 1) });
+            objc.msg(void, objc.class("NSGraphicsContext"), "restoreGraphicsState", .{});
+        }
         a.pixels.resize(a.gpa, bw * bh) catch return null;
         for (a.pixels.items, 0..) |*m, i| m.* = rgba[i * 4 + 3];
         a.upload(origin, bw, bh);
@@ -256,3 +259,24 @@ pub const Atlas = struct {
         return at;
     }
 };
+
+/// The SF Symbol `name` at `point_size` and `weight` (regular, medium,
+/// semibold, bold): an NSImage on macOS, a UIImage on iOS.
+fn symbolImage(name: []const u8, point_size: f32, weight: u8) ?objc.Object {
+    if (objc.uikit) {
+        // UIImageSymbolWeight: regular is 4, then medium, semibold, bold.
+        const config = objc.msg(objc.Object, objc.class("UIImageSymbolConfiguration"), "configurationWithPointSize:weight:", .{
+            @as(f64, point_size), @as(objc.NSInteger, 4 + @as(objc.NSInteger, @min(weight, 3))),
+        });
+        return objc.msg(?objc.Object, objc.class("UIImage"), "systemImageNamed:withConfiguration:", .{ objc.nsString(name), config });
+    }
+    const base = objc.msg(?objc.Object, objc.class("NSImage"), "imageWithSystemSymbolName:accessibilityDescription:", .{
+        objc.nsString(name), @as(?objc.Object, null),
+    }) orelse return null;
+    // NSFontWeight: regular, medium, semibold, bold.
+    const weights = [_]f64{ 0, 0.23, 0.3, 0.4 };
+    const config = objc.msg(objc.Object, objc.class("NSImageSymbolConfiguration"), "configurationWithPointSize:weight:", .{
+        @as(f64, point_size), weights[@min(weight, 3)],
+    });
+    return objc.msg(?objc.Object, base, "imageWithSymbolConfiguration:", .{config});
+}

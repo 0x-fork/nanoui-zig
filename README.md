@@ -318,17 +318,17 @@ zig-out/bin/hello --nanoui-eval='nanoui.call("Greeter.greet","Ada").then(v => { 
 ## Platforms
 
 nanoui loads what each platform has instead of linking it, so every platform
-builds from any machine. On a Mac, `zig build -Dtarget=x86_64-linux-gnu` or
+builds from any machine (iOS from a Mac with Xcode, for its SDK). On a Mac, `zig build -Dtarget=x86_64-linux-gnu` or
 `-Dtarget=x86_64-windows-gnu` makes a Linux or Windows binary.
 
-| | macOS | Linux | Windows |
-|---|---|---|---|
-| windows, input, timers | AppKit | GTK 4, else GTK 3 (loaded with `dlopen`) | Win32 |
-| text | CoreText | nanoui's TrueType reader (`src/ui/tt/`) | the same |
-| rendering | Metal | CPU (`src/ui/raster.zig`), shown with cairo | CPU, shown by Direct3D 11 (a DXGI flip swap chain; GDI without it) |
-| icons | SF Symbols | line icons drawn by nanoui (`src/ui/icons.zig`) | the same |
-| pages (webview) | WKWebView | not yet | not yet |
-| menus | the menu bar | accelerators | accelerators |
+| | macOS | iOS | Linux | Windows |
+|---|---|---|---|---|
+| windows, input, timers | AppKit | UIKit: screens over each other, touch, keyboards | GTK 4, else GTK 3 (loaded with `dlopen`) | Win32 |
+| text | CoreText | CoreText | nanoui's TrueType reader (`src/ui/tt/`) | the same |
+| rendering | Metal | Metal | CPU (`src/ui/raster.zig`), shown with cairo | CPU, shown by Direct3D 11 (a DXGI flip swap chain; GDI without it) |
+| icons | SF Symbols | SF Symbols | line icons drawn by nanoui (`src/ui/icons.zig`) | the same |
+| pages (webview) | WKWebView | not yet | not yet | not yet |
+| menus | the menu bar | a keyboard's shortcuts | accelerators | accelerators |
 
 The CPU renderer matches the Metal one pixel for pixel, and a test compares
 them. `zig build test -Dportable=true` runs the Linux and Windows text and
@@ -342,6 +342,48 @@ event signals and waiting calls (`src/linux/surface_gtk4.zig`). On Windows,
 frames reach the screen through a Direct3D 11 device (hardware, else WARP)
 and a flip-sequential swap chain, so resizing stays smooth and content
 stays anchored (`src/windows/d3d.zig`).
+
+### iOS
+
+Native UI runs on iOS with the Mac's renderer and text, Metal and
+CoreText; `src/ios/` puts them on UIKit. The first window fills the
+screen, and windows shown after it cover it until they close or hide; a
+window over another needs its own way to close (no swipe down). A finger
+is the pointer: it presses and drags, and scrolls what it moves up or
+down over, flinging as iOS's scroll views do. A hardware keyboard's
+keys and shortcuts work as on the Mac, and a focused text field brings
+up the software keyboard. Views are laid out inside the safe area,
+clear of the status bar, the home indicator and the keyboard; a window
+made with `.full_bleed = true` spans the screen and keeps its content
+clear itself with `ui.div(c).safeArea()`.
+
+```sh
+zig build $(sh tools/ios/zig-lib.sh) -Dtarget=aarch64-ios-simulator               # zig-out/ios/Counter.app, Gallery.app
+zig build $(sh tools/ios/zig-lib.sh) run-gallery -Dtarget=aarch64-ios-simulator   # in the booted Simulator
+```
+
+You need Xcode for the iOS SDK. Zig 0.17.0's std can't build programs for
+iOS as it ships: it takes iOS for a system that can replace its process
+image (`std.process.can_replace`). `tools/ios/zig-lib.sh` makes Zig's lib
+folder again out of links to it, with that one line fixed, and prints the
+`--zig-lib` flag that uses it (nothing, once Zig is fixed), which goes
+first after `zig build`.
+
+`-Dtarget=aarch64-ios` builds for devices: sign the app with your team
+(Xcode, or `codesign` and a provisioning profile) and install it with
+`xcrun devicectl`. An app bundles itself in its own build.zig:
+
+```zig
+const bundle = @import("nanoui").ios.app(b, exe, .{ .name = "Notes", .id = "com.example.notes" });
+```
+
+Zig 0.17 makes iOS 18 the lowest an app runs on unless the target names
+one, and the app's Info.plist follows it. nanoui runs on iOS 15 and
+later: `-Dtarget=aarch64-ios.15.0` (or `aarch64-ios.15.0-simulator`)
+reaches those devices.
+
+Not on iOS yet: pages, input methods that compose text (Japanese,
+Chinese), keys repeating while held, and more than one window on an iPad.
 
 ## Apps
 
@@ -410,8 +452,8 @@ Rules for working here, by hand or with an agent, are in
 [AGENTS.md](AGENTS.md).
 
 nanoui is a subset of what full frameworks offer. Pages work only on macOS so
-far, and there's no accessibility, bundling, notifications, channels or
-plugins yet. Apps update themselves from GitHub releases on macOS
+far, and there's no accessibility, notifications, channels or plugins yet,
+and bundling only for iOS. Apps update themselves from GitHub releases on macOS
 (`nanoui.Updater`). Bound methods run on the main thread.
 
 ## License
