@@ -18,32 +18,45 @@ pub const Options = struct {
 /// target (the Simulator's or a device's), as a path in the cache.
 pub fn app(b: *std.Build, exe: *std.Build.Step.Compile, opts: Options) std.Build.LazyPath {
     const target = exe.root_module.resolved_target.?.result;
-    if (target.abi != .simulator) linkDeviceSdk(b, exe, target);
     const dir = b.fmt("{s}.app", .{opts.name});
     const wf = b.addWriteFiles();
     _ = wf.add(b.fmt("{s}/Info.plist", .{dir}), infoPlist(b, exe.name, target, opts));
-    _ = wf.addCopyFile(exe.getEmittedBin(), b.fmt("{s}/{s}", .{ dir, exe.name }));
+    _ = wf.addCopyFile(executable(b, exe), b.fmt("{s}/{s}", .{ dir, exe.name }));
     return wf.getDirectory().path(b, dir);
 }
 
-/// Zig 0.17.0 has no libc of its own for iOS: without a libc file it links
-/// every iOS program against its own libSystem.tbd, which is macOS's. The
-/// Simulator gets by (Zig lets it use macOS's symbols); a device finds
-/// none. A libc file naming the iPhoneOS SDK links the SDK's libSystem.
-/// (Not for the Simulator: Zig can't read its SDK's version.)
-fn linkDeviceSdk(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Target) void {
-    const sdk = std.zig.system.darwin.getSdk(b.allocator, b.graph.io, &target) orelse return;
-    const libc = b.addWriteFiles().add("libc.txt", b.fmt(
-        \\include_dir={0s}/usr/include
-        \\sys_include_dir={0s}/usr/include
-        \\crt_dir={0s}/usr/lib
-        \\msvc_lib_dir=
-        \\kernel32_lib_dir=
-        \\cc_dir=
-        \\darwin_sdk_dir={0s}
-        \\
-    , .{sdk}));
-    exe.setLibCFile(libc);
+/// `exe` as an app's program. For the Simulator, as Zig links it. For a
+/// device, Zig compiles it and Apple's linker links it: an iPhone won't
+/// start a program Zig 0.17.0 links (it is refused before it runs, with
+/// no crash report), while the Simulator runs the same. Apple's linker
+/// gets what `exe`'s modules ask for: frameworks, system and static
+/// libraries, and where to find them.
+pub fn executable(b: *std.Build, exe: *std.Build.Step.Compile) std.Build.LazyPath {
+    const target = exe.root_module.resolved_target.?.result;
+    if (target.abi == .simulator) return exe.getEmittedBin();
+    const obj = b.addObject(.{ .name = exe.name, .root_module = exe.root_module, .use_llvm = exe.use_llvm, .zig_lib_dir = exe.zig_lib_dir });
+    obj.bundle_compiler_rt = true;
+    const min = target.os.version_range.semver.min;
+    const link = b.addSystemCommand(&.{ "xcrun", "-sdk", "iphoneos", "clang", "-target", b.fmt("arm64-apple-ios{d}.{d}", .{ min.major, min.minor }) });
+    link.addFileArg(obj.getEmittedBin());
+    for (exe.root_module.getGraph().modules) |m| {
+        for (m.lib_paths.items) |p| link.addPrefixedDirectoryArg("-L", p);
+        for (m.include_dirs.items) |d| switch (d) {
+            .framework_path, .framework_path_system => |p| link.addPrefixedDirectoryArg("-F", p),
+            else => {},
+        };
+        for (m.frameworks.keys(), m.frameworks.values()) |name, f| {
+            if (f.weak) link.addArg(b.fmt("-Wl,-weak_framework,{s}", .{name})) else if (f.needed) link.addArg(b.fmt("-Wl,-needed_framework,{s}", .{name})) else link.addArgs(&.{ "-framework", name });
+        }
+        for (m.link_objects.items) |o| switch (o) {
+            .system_lib => |l| link.addArg(b.fmt("{s}{s}", .{ if (l.weak) "-Wl,-weak-l" else if (l.needed) "-Wl,-needed-l" else "-l", l.name })),
+            .static_path => |p| link.addFileArg(p),
+            .other_step => |s| link.addArtifactArg(s),
+            else => {},
+        };
+    }
+    link.addArg("-o");
+    return link.addOutputFileArg(exe.name);
 }
 
 /// A step that installs `bundle` in the booted Simulator and runs it,
