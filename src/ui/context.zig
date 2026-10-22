@@ -18,6 +18,8 @@ pub const Content = union(enum) {
     icon: Icon,
     image: Image,
     texture: Texture,
+    /// What a canvas draws (`ui.canvas`), at points within its box.
+    canvas: *const @import("draw.zig").Canvas,
 
     /// One of this frame's textures (`Context.textures`), the part `uv`
     /// (0 to 1) of it shown.

@@ -1,6 +1,6 @@
 //! The OpenGL renderer against the CPU renderer, in an OpenGL context
 //! without a window (EGL's surfaceless platform, as Mesa has it): the
-//! widgets and glass scenes drawn by both must come out the same, to
+//! widgets, glass and canvas scenes drawn by both must come out the same, to
 //! rounding. Skipped where there is no EGL or no OpenGL 3.3.
 const std = @import("std");
 const testing = std.testing;
@@ -122,5 +122,15 @@ test "the OpenGL renderer draws what the CPU renderer draws" {
         t.settle(1);
         // Measured: a mean of 0.015 and at worst 2 levels apart.
         try compare(&t, .{ .mean = 0.1, .worst = 24, .off_in = 500 });
+    }
+    {
+        // Lines, dashes, a filled polygon (triangles meeting at an edge).
+        const Scene = @import("tests_canvas.zig").Scene;
+        var s: Scene = .{};
+        var t: ui.Tester = undefined;
+        try t.init(gpa, .init(&s, Scene.view), .{ .width = 240, .height = 180 });
+        defer t.deinit();
+        t.settle(0.1);
+        try compare(&t, .{ .mean = 0.05, .worst = 32, .off_in = 1000 });
     }
 }

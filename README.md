@@ -346,6 +346,22 @@ stays anchored (`src/windows/d3d.zig`).
 
 ### iOS
 
+<p align="center"><img src="docs/images/ios-gallery.gif" width="300" alt="The gallery example on an iPhone in the iOS Simulator: pages pushed from a list, buttons, toggles, a task list typed into, a 10 000-row list filtered, springs, and Liquid Glass"></p>
+
+The gallery on an iPhone ([MP4](docs/images/ios-gallery.mp4)). It's the same
+Zig view as on the Mac. When the window is narrow it shows its pages as a list
+and pushes each one in. The app played this itself:
+
+```sh
+xcrun simctl launch booted dev.nanoui.gallery "--nanoui-play=tap:Tasks;tap:Something to do;type:Record a demo;tap:Add"
+xcrun simctl io booted recordVideo demo.mov
+```
+
+`--nanoui-play` takes the same steps as `--nanoui-script` (tap, type, key,
+scroll, wait) and plays them in the running app at a person's pace, with a
+dot where each finger lands. It works on macOS too. The Simulator can record
+its screen but can't tap, so this is how you make demo videos.
+
 Native UI runs on iOS with the Mac's renderer and text, Metal and
 CoreText; `src/ios/` puts them on UIKit. The first window fills the
 screen, and windows shown after it cover it until they close or hide; a
@@ -361,7 +377,14 @@ clear itself with `ui.div(c).safeArea()`.
 ```sh
 zig build $(sh tools/ios/zig-lib.sh) -Dtarget=aarch64-ios-simulator               # zig-out/ios/Counter.app, Gallery.app
 zig build $(sh tools/ios/zig-lib.sh) run-gallery -Dtarget=aarch64-ios-simulator   # in the booted Simulator
+zig build $(sh tools/ios/zig-lib.sh) run-gallery -Dtarget=aarch64-ios-simulator --watch   # again on every save
 ```
+
+With `--watch`, each save builds the app, installs it and launches it
+again in the Simulator in a few seconds, its output in the same terminal.
+A release build (`-Doptimize=ReleaseSmall`) is stripped of its local
+symbols as it is bundled: the counter is about 300 KB, the gallery about
+500 KB, the renderer, text and widgets in them.
 
 You need Xcode for the iOS SDK. Zig 0.17.0's std can't build programs for
 iOS as it ships: it takes iOS for a system that can replace its process
@@ -404,7 +427,10 @@ Chinese), keys repeating while held, and more than one window on an iPad.
       <a href="https://github.com/justrach/nanostudio"><img src="docs/images/nanostudio-dark.png" alt="nanostudio: the editor with a zoom on the timeline"></a>
       <p><a href="https://github.com/justrach/nanostudio"><strong>nanostudio</strong></a>: a screen recorder and editor. It records a display or a window with its sound, then zooms where you clicked. You can trim, speed up and dress the take, and export it. Every frame, preview and export alike, is a nanoui view.</p>
     </td>
-    <td width="50%" valign="top"></td>
+    <td width="50%" valign="top">
+      <a href="https://github.com/justrach/nanofly"><img src="docs/images/nanofly.png" alt="nanofly: Frankfurt to Los Angeles on the map, the flight's card under it" width="300"></a>
+      <p><a href="https://github.com/justrach/nanofly"><strong>nanofly</strong></a>: flights, live, on a map, for iPhone (and the Mac). It finds a flight's route, follows it from open ADS-B data, and says when it lands by each airport's clock. Its map is drawn by <code>ui.canvas</code>, from Natural Earth's land as triangles.</p>
+    </td>
   </tr>
 </table>
 

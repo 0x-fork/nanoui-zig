@@ -189,6 +189,7 @@ pub const Surface = struct {
         self.last_frame_time = now;
         c.reduced_motion = reduceMotion();
         const r = frame_mod.run(c, self.view, &self.text, &self.instances, self.size, self.scale, self.theme(), dt, now - self.start_time);
+        @import("../play.zig").paint(self.gpa, &self.instances);
         self.renderer.syncImages(&self.text.images);
         self.renderer.textures = c.textures.items;
         self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);

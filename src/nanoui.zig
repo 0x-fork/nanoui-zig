@@ -64,6 +64,8 @@ const plat = switch (builtin.os.tag) {
 /// The Objective-C runtime (macOS and iOS).
 pub const objc = if (mac or builtin.os.tag == .ios) @import("objc.zig") else struct {};
 pub const ui = @import("ui/ui.zig");
+/// HTTP requests answered on the main thread (http.zig).
+pub const http = @import("http.zig");
 /// Components after GPUI Kit: buttons, overlays, tabs, forms, toasts.
 pub const kit = @import("kit/kit.zig");
 pub const tsgen = @import("tsgen.zig");
@@ -112,6 +114,7 @@ test {
     std.testing.refAllDecls(kit);
     _ = @import("menu_types.zig");
     _ = @import("update.zig");
+    _ = @import("http.zig");
     // The updater is for desktop apps; iOS updates through the App Store.
     if (builtin.os.tag != .ios) _ = @import("update_portable.zig");
     if (builtin.os.tag == .ios) {
