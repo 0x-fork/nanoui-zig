@@ -101,7 +101,7 @@ pub const Surface = struct {
         };
         self.ctx = .init(gpa, &self.text);
         objc.setZig(uiview, self);
-        objc.msg(void, uiview, "setMultipleTouchEnabled:", .{objc.NO});
+        objc.msg(void, uiview, "setMultipleTouchEnabled:", .{objc.YES});
         const layer = objc.msg(objc.Object, uiview, "layer", .{});
         objc.msg(void, layer, "addSublayer:", .{renderer.layer});
         keys.attach(self);
