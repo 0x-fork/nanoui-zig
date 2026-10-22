@@ -1,7 +1,8 @@
 //! HTTP requests, answered on the main thread: the system's own client
 //! on macOS and iOS (NSURLSession: its TLS, proxies, caches and
-//! certificates), so an app need bring none. Not yet on Linux and
-//! Windows, where `fetch` answers with an error.
+//! certificates), so an app need bring none; on Linux and Windows,
+//! http-zig's (HTTP/2 over TLS, HTTP/1.1 where a server has no h2), each
+//! request on a thread of its own (`http_portable.zig`).
 //!
 //!     nanoui.http.fetch(gpa, .{ .url = "https://example.com/data.json" }, state, State.loaded);
 //!
@@ -13,6 +14,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const apple = builtin.os.tag == .macos or builtin.os.tag == .ios;
 const objc = if (apple) @import("objc.zig") else struct {};
+const portable = @import("http_portable.zig");
 
 pub const Header = struct { name: []const u8, value: []const u8 };
 
@@ -21,7 +23,8 @@ pub const Request = struct {
     method: []const u8 = "GET",
     headers: []const Header = &.{},
     body: []const u8 = "",
-    /// Seconds without a byte before it gives up.
+    /// Seconds without a byte before it gives up (on Linux and Windows,
+    /// for the whole answer).
     timeout: f64 = 30,
 };
 
@@ -41,14 +44,14 @@ pub fn fetch(gpa: std.mem.Allocator, req: Request, ctx: anytype, comptime done: 
     const P = Pending(@TypeOf(ctx), done);
     const p = gpa.create(P) catch return done(ctx, .{ .status = 0, .body = "", .err = "out of memory" });
     p.* = .{ .gpa = gpa, .ctx = ctx };
-    if (!apple) {
-        p.err = "nanoui.http: not on this platform yet";
-        return P.deliver(p);
-    }
+    if (!apple) return portable.fetch(gpa, req, &p.answer, p, P.deliverC) catch {
+        p.answer.err = "out of memory";
+        P.deliver(p);
+    };
     const pool = objc.Pool.push();
     defer pool.pop();
     const url = objc.msg(?objc.Object, objc.class("NSURL"), "URLWithString:", .{objc.nsString(req.url)}) orelse {
-        p.err = "not a URL";
+        p.answer.err = "not a URL";
         return P.deliver(p);
     };
     const r = objc.msg(objc.Object, objc.class("NSMutableURLRequest"), "requestWithURL:", .{url});
@@ -67,28 +70,35 @@ pub fn fetch(gpa: std.mem.Allocator, req: Request, ctx: anytype, comptime done: 
     objc.msg(void, task, "resume", .{});
 }
 
+/// What came back, filled before it is taken to the main thread: the
+/// body and an error's words owned (`err_owned`) by the allocator.
+pub const Answer = struct {
+    status: u16 = 0,
+    body: []u8 = &.{},
+    err: []const u8 = "",
+    err_owned: bool = false,
+};
+
 fn Pending(comptime Ctx: type, comptime done: fn (Ctx, Response) void) type {
     return struct {
         gpa: std.mem.Allocator,
         ctx: Ctx,
-        status: u16 = 0,
-        body: []u8 = &.{},
-        err: []const u8 = "",
-        err_owned: bool = false,
+        answer: Answer = .{},
 
         const Self = @This();
 
         /// On the session's queue: the answer copied, then taken to the main thread.
-        fn answered(p: *Self, data: ?objc.Object, response: ?objc.Object, err: ?objc.Object) void {
+        fn answered(s: *Self, data: ?objc.Object, response: ?objc.Object, err: ?objc.Object) void {
             const pool = objc.Pool.push();
             defer pool.pop();
+            const p = &s.answer;
             if (response) |res| {
                 if (objc.msg(objc.BOOL, res, "isKindOfClass:", .{objc.class("NSHTTPURLResponse")}) != objc.NO)
                     p.status = @intCast(std.math.clamp(objc.msg(objc.NSInteger, res, "statusCode", .{}), 0, 999));
             }
             if (data) |d| {
                 const len = objc.msg(objc.NSUInteger, d, "length", .{});
-                if (len > 0) if (p.gpa.alloc(u8, len)) |body| {
+                if (len > 0) if (s.gpa.alloc(u8, len)) |body| {
                     const bytes = objc.msg(?[*]const u8, d, "bytes", .{});
                     if (bytes) |b| @memcpy(body, b[0..len]);
                     p.body = body;
@@ -98,30 +108,34 @@ fn Pending(comptime Ctx: type, comptime done: fn (Ctx, Response) void) type {
             }
             if (err) |e| {
                 const why = objc.fromNSString(objc.msg(?objc.Object, e, "localizedDescription", .{}));
-                if (p.gpa.dupe(u8, why)) |copy| {
+                if (s.gpa.dupe(u8, why)) |copy| {
                     p.err = copy;
                     p.err_owned = true;
                 } else |_| p.err = "failed";
                 p.status = 0;
             }
-            objc.dispatchMain(p, deliverC);
+            objc.dispatchMain(s, deliverC);
         }
 
         fn deliverC(context: ?*anyopaque) callconv(.c) void {
             deliver(@ptrCast(@alignCast(context.?)));
         }
 
-        fn deliver(p: *Self) void {
-            done(p.ctx, .{ .status = p.status, .body = p.body, .err = p.err });
-            p.gpa.free(p.body);
-            if (p.err_owned) p.gpa.free(p.err);
-            p.gpa.destroy(p);
+        fn deliver(s: *Self) void {
+            const p = &s.answer;
+            done(s.ctx, .{ .status = p.status, .body = p.body, .err = p.err });
+            s.gpa.free(p.body);
+            if (p.err_owned) s.gpa.free(p.err);
+            s.gpa.destroy(s);
         }
     };
 }
 
+test {
+    _ = portable;
+}
+
 test "a request is answered on the main thread, its body copied" {
-    if (!apple) return error.SkipZigTest;
     const State = struct {
         body: [16]u8 = undefined,
         len: usize = 0,
@@ -129,7 +143,7 @@ test "a request is answered on the main thread, its body copied" {
         on_main: bool = false,
         fn done(s: *@This(), r: Response) void {
             s.answered = true;
-            s.on_main = objc.isMainThread();
+            s.on_main = if (apple) objc.isMainThread() else true;
             s.len = @min(r.body.len, s.body.len);
             @memcpy(s.body[0..s.len], r.body[0..s.len]);
         }

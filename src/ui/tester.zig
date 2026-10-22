@@ -189,6 +189,16 @@ pub const Tester = struct {
         t.ctx.updateHot();
     }
 
+    /// Pinches about (x, y): spread by `factor`, the fingers moved together
+    /// by (dx, dy), as two fingers on a touch screen do.
+    pub fn pinch(t: *Tester, x: f32, y: f32, factor: f32, dx: f32, dy: f32) void {
+        t.ctx.input.mouse = .{ .x = x, .y = y };
+        t.ctx.input.zoom = factor;
+        t.ctx.input.pan = .{ .x = dx, .y = dy };
+        t.frame();
+        t.ctx.updateHot();
+    }
+
     /// The rectangle of the text `s` in the last frame.
     pub fn findText(t: *Tester, s: []const u8) ?types.Rect {
         for (t.ctx.nodes.items) |n| switch (n.content) {

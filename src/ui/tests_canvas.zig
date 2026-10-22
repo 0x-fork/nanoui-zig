@@ -1,6 +1,7 @@
 //! Canvases (`ui.canvas`): lines, dashes, triangles and polygons drawn
 //! where they should be, clipped to their box, the same on the CPU as with
-//! Metal, and a polygon's triangles meeting without a seam.
+//! Metal, and a polygon's triangles meeting without a seam; a pinch over
+//! one (a map's zoom).
 const std = @import("std");
 const testing = std.testing;
 const ui = @import("ui.zig");
@@ -122,4 +123,36 @@ test "a canvas draws the same on the CPU as with Metal" {
     try testing.expect(mean < 0.05);
     // Edges may round differently; no more than one channel in a thousand.
     try testing.expect(off * 1000 < metal.bytes.len);
+}
+
+const Pinched = struct {
+    zoom: f32 = 1,
+    pan: ui.Point = .{},
+    at: ui.Point = .{},
+
+    pub fn view(p: *Pinched, c: *ui.Context) void {
+        if (c.input.zoom != 1 or c.input.pan.x != 0 or c.input.pan.y != 0) {
+            p.zoom *= c.input.zoom;
+            p.pan = .{ .x = p.pan.x + c.input.pan.x, .y = p.pan.y + c.input.pan.y };
+            p.at = c.input.mouse;
+        }
+        _ = ui.canvas(c, .{ .width = .fill, .height = .fill });
+    }
+};
+
+test "a pinch comes to the view once, as a zoom and a pan about its middle" {
+    const gpa = testing.allocator;
+    var p: Pinched = .{};
+    var t: ui.Tester = undefined;
+    try t.init(gpa, .init(&p, Pinched.view), .{ .width = 200, .height = 200 });
+    defer t.deinit();
+    t.frame();
+    t.pinch(60, 80, 2, 5, -3);
+    t.pinch(60, 80, 1.5, 0, 0);
+    try testing.expectApproxEqAbs(@as(f32, 3), p.zoom, 1e-5);
+    try testing.expectEqual(ui.Point{ .x = 5, .y = -3 }, p.pan);
+    try testing.expectEqual(ui.Point{ .x = 60, .y = 80 }, p.at);
+    // Consumed: the next frame sees none.
+    t.frame();
+    try testing.expectApproxEqAbs(@as(f32, 3), p.zoom, 1e-5);
 }
