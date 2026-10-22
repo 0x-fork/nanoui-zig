@@ -39,6 +39,9 @@ pub fn view(g: anytype, c: *ui.Context) void {
     ui.text(c, "nanoui", .{ .size = 17, .color = th.accent });
     back.end();
     g.content(c);
+    // Escape (Android's Back) returns too, once the page didn't take it
+    // and no field has the focus (it lets go of that first).
+    if (c.focused_text == null and c.shortcut(.{ .key = ui.Shortcut.escape })) g.open = false;
 }
 
 fn home(g: anytype, c: *ui.Context) void {

@@ -1,4 +1,4 @@
-//! Text where nanoui shapes it itself (Linux, Windows, and macOS built
+//! Text where nanoui shapes it itself (Linux, Windows, Android, and macOS built
 //! with `-Dportable=true`): the installed TrueType fonts (`tt/fontdb.zig`),
 //! characters to glyphs with kerning and fallback fonts for characters a
 //! font lacks, greedy wrapping at spaces, carets, and the glyph atlas.

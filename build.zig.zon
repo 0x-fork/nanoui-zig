@@ -18,5 +18,7 @@
         "src",
         // build.zig imports tools/ios/bundle.zig; apps run sim.sh and zig-lib.sh.
         "tools/ios",
+        // build.zig imports tools/android/apk.zig (and pack.zig); apps run run.sh.
+        "tools/android",
     },
 }
