@@ -46,6 +46,10 @@ pub fn build(b: *std.Build) void {
         nanoui.linkSystemLibrary("objc", .{});
     }
     // Elsewhere GTK is loaded when the app starts (dlopen): nothing to link.
+    // HTTP there is http-zig's (nanoui.http), fetched only for those targets.
+    if (os != .macos and os != .ios) {
+        if (b.lazyDependency("http_zig", .{ .target = target, .optimize = optimize })) |d| nanoui.addImport("http_zig", d.module("http_zig"));
+    }
 
     // nui: the command that makes and checks apps (tools/nui).
     const nui_options = b.addOptions();
