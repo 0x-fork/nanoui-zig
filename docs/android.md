@@ -20,12 +20,11 @@ builds for x86 emulators and Chromebooks. A release build of the gallery
 (`-Doptimize=ReleaseSmall`) is about 730 KB. Arguments reach a debuggable
 build (a debug APK) as the intent's extras (`run-*` passes them, and
 `NANOUI_*` variables); a release build ignores them, as any app could send
-them, and says so in the log. What it prints goes to `adb logcat -s nanoui`, and `--nanoui-snapshot`
-works on a device too, into a path of the app's (`adb shell run-as` reads
-it). Zig
-0.17.0's std lays out `struct sigaction` as glibc does and looks host
-names up in /etc/resolv.conf, neither of which fits Android: nanoui
-translates the one and asks Android's resolver instead.
+them, and says so in the log. What it prints goes to `adb logcat -s nanoui`,
+and `--nanoui-snapshot` works on a device too, into a path of the app's
+(`adb shell run-as` reads it). Zig 0.17.0's std lays out `struct sigaction`
+as glibc does and looks host names up in /etc/resolv.conf, neither of which
+fits Android: nanoui translates the one and asks Android's resolver instead.
 
 Not yet: pages, file pickers (`dialog.open` answers null), input methods
 that compose text (a software keyboard types keys: what Android's key maps
