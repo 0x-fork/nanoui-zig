@@ -49,12 +49,17 @@ pub fn executable(b: *std.Build, exe: *std.Build.Step.Compile) std.Build.LazyPat
             if (f.weak) link.addArg(b.fmt("-Wl,-weak_framework,{s}", .{name})) else if (f.needed) link.addArg(b.fmt("-Wl,-needed_framework,{s}", .{name})) else link.addArgs(&.{ "-framework", name });
         }
         for (m.link_objects.items) |o| switch (o) {
-            .system_lib => |l| link.addArg(b.fmt("{s}{s}", .{ if (l.weak) "-Wl,-weak-l" else if (l.needed) "-Wl,-needed-l" else "-l", l.name })),
+            .system_lib => |l| if (l.use_pkg_config == .force)
+                std.debug.panic("ios: {s} asks for pkg-config, which has no iPhoneOS answer", .{l.name})
+            else
+                link.addArg(b.fmt("{s}{s}", .{ if (l.weak) "-Wl,-weak-l" else if (l.needed) "-Wl,-needed-l" else "-l", l.name })),
             .static_path => |p| link.addFileArg(p),
             .other_step => |s| link.addArtifactArg(s),
             else => {},
         };
     }
+    // As Zig's linker does unless told not to: unused code left out.
+    if (exe.link_gc_sections orelse true) link.addArg("-Wl,-dead_strip");
     link.addArg("-o");
     return stripped(b, exe, link.addOutputFileArg(exe.name));
 }
