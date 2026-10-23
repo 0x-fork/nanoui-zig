@@ -108,12 +108,13 @@ pub const Gl = struct {
         return ndk.eglMakeCurrent(g.display, s, s, g.context) != 0;
     }
 
-    /// Shows what was drawn.
-    pub fn swap(g: *Gl) void {
-        if (g.surface == null) return;
-        if (ndk.eglSwapBuffers(g.display, g.surface) == 0) {
-            const err = ndk.eglGetError();
-            if (err != 0x3000) std.log.warn("nanoui: eglSwapBuffers failed (0x{x})", .{err});
-        }
+    /// Shows what was drawn; false if it couldn't (the context lost, say).
+    pub fn swap(g: *Gl) bool {
+        if (g.surface == null) return true;
+        if (ndk.eglSwapBuffers(g.display, g.surface) != 0) return true;
+        const err = ndk.eglGetError();
+        if (err == 0x3000) return true;
+        std.log.warn("nanoui: eglSwapBuffers failed (0x{x})", .{err});
+        return false;
     }
 };

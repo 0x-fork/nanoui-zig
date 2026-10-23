@@ -8,6 +8,7 @@
 //!
 //! or, typed by hand, string arrays (am splits them at commas):
 //! `--esa nanoui.args --nanoui-dark --esa nanoui.env NANOUI_DEBUG=1`.
+//! Only a debuggable build reads them: in a release, any app could.
 const std = @import("std");
 const ndk = @import("ndk.zig");
 const jni = @import("jni.zig");
@@ -39,7 +40,10 @@ pub fn readExtras(env: jni.Env, act: jni.Object, argv: *std.ArrayList([*:0]const
     const frame = jni.Frame.push(env, 64);
     defer frame.pop();
     const intent = jni.call(env, act, "getIntent", "()Landroid/content/Intent;", &.{}) orelse return;
-    for ([_]bool{ true, false }) |args| {
+    // Any app may start the launcher activity with any extras: only a
+    // debuggable build (a debug APK, adb's) takes them, so another app
+    // can't play steps in a release build's window or set its environment.
+    if (debuggable(env, act)) for ([_]bool{ true, false }) |args| {
         // String arrays first, then one extra each.
         const k = jni.string(env, if (args) "nanoui.args" else "nanoui.env");
         const array = jni.call(env, intent, "getStringArrayExtra", "(Ljava/lang/String;)[Ljava/lang/String;", &.{jni.ref(k)}) orelse null;
@@ -57,7 +61,7 @@ pub fn readExtras(env: jni.Env, act: jni.Object, argv: *std.ArrayList([*:0]const
             defer jni.deleteLocal(env, value);
             take(env, value, args, argv);
         }
-    }
+    };
     // Where temporary files go: the app's cache (Android sets no TMPDIR).
     if (getenv("TMPDIR") == null) if (cacheDir(env, act)) |dir| {
         defer gpa.free(dir);
@@ -89,6 +93,13 @@ fn cacheDir(env: jni.Env, act: jni.Object) ?[]u8 {
     const file = jni.call(env, act, "getCacheDir", "()Ljava/io/File;", &.{}) orelse return null;
     const path = jni.call(env, file, "getAbsolutePath", "()Ljava/lang/String;", &.{}) orelse return null;
     return jni.fromString(env, std.heap.c_allocator, path) catch null;
+}
+
+/// Whether the app is debuggable (ApplicationInfo.FLAG_DEBUGGABLE).
+fn debuggable(env: jni.Env, act: jni.Object) bool {
+    const info = jni.call(env, act, "getApplicationInfo", "()Landroid/content/pm/ApplicationInfo;", &.{}) orelse return false;
+    const flags = jni.intField(env, info, "flags") orelse return false;
+    return flags & 0x2 != 0;
 }
 
 /// stdout and stderr to the log, a line at a time, from a thread that

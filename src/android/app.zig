@@ -295,6 +295,7 @@ pub const App = struct {
         std.log.warn("nanoui: OpenGL ES failed: drawing on the CPU", .{});
         for (self.windows.items) |w| if (w.surface) |s| {
             s.renderer = null;
+            s.ctx.renderer = "CPU";
         };
         if (self.gl) |*g| g.deinit();
         self.gl = null;

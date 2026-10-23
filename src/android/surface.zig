@@ -209,7 +209,12 @@ pub const Surface = struct {
     fn present(self: *Surface) void {
         const app = self.app;
         if (app.gl) |*g| {
-            if (!g.makeCurrent()) return;
+            // OpenGL ES failing once it worked (a lost context) would leave
+            // the screen as it was while the app goes on: the CPU draws.
+            if (!g.makeCurrent()) {
+                app.cpuFromNow();
+                return self.presentCpu();
+            }
             if (self.renderer == null) {
                 self.renderer = opengl.Renderer.initEs() catch {
                     std.log.warn("nanoui: OpenGL ES renderer failed: drawing on the CPU", .{});
@@ -221,8 +226,8 @@ pub const Surface = struct {
             const r = &self.renderer.?;
             r.sync(self.text.atlas.mask(), self.text.atlas.generation, self.text.images.pictures(), self.text.images.generation);
             r.draw(self.instances.items, self.size, self.scale, self.ctx.theme.background, 0);
-            g.swap();
-            return;
+            if (g.swap()) return;
+            app.cpuFromNow();
         }
         self.presentCpu();
     }
