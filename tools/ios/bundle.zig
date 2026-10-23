@@ -33,7 +33,7 @@ pub fn app(b: *std.Build, exe: *std.Build.Step.Compile, opts: Options) std.Build
 /// libraries, and where to find them.
 pub fn executable(b: *std.Build, exe: *std.Build.Step.Compile) std.Build.LazyPath {
     const target = exe.root_module.resolved_target.?.result;
-    if (target.abi == .simulator) return exe.getEmittedBin();
+    if (target.abi == .simulator) return stripped(b, exe, exe.getEmittedBin());
     const obj = b.addObject(.{ .name = exe.name, .root_module = exe.root_module, .use_llvm = exe.use_llvm, .zig_lib_dir = exe.zig_lib_dir });
     obj.bundle_compiler_rt = true;
     const min = target.os.version_range.semver.min;
@@ -56,7 +56,18 @@ pub fn executable(b: *std.Build, exe: *std.Build.Step.Compile) std.Build.LazyPat
         };
     }
     link.addArg("-o");
-    return link.addOutputFileArg(exe.name);
+    return stripped(b, exe, link.addOutputFileArg(exe.name));
+}
+
+/// A release's program without its local symbols (about a tenth of it),
+/// which Zig's linker keeps however it is asked; a debug build's as it
+/// is. Xcode's strip: any iOS build has Xcode for the SDK.
+fn stripped(b: *std.Build, exe: *std.Build.Step.Compile, bin: std.Build.LazyPath) std.Build.LazyPath {
+    if (exe.root_module.optimize.? == .debug) return bin;
+    const strip = b.addSystemCommand(&.{ "xcrun", "strip", "-x", "-o" });
+    const out = strip.addOutputFileArg(exe.name);
+    strip.addFileArg(bin);
+    return out;
 }
 
 /// A step that installs `bundle` in the booted Simulator and runs it,
