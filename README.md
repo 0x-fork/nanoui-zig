@@ -322,22 +322,23 @@ is there in the snapshot.
 ## Platforms
 
 nanoui loads what each platform has instead of linking it, so every platform
-builds from any machine (iOS from a Mac with Xcode, for its SDK). On a Mac, `zig build -Dtarget=x86_64-linux-gnu` or
+builds from any machine (iOS from a Mac with Xcode, for its SDK; Android with
+Android's SDK and NDK). On a Mac, `zig build -Dtarget=x86_64-linux-gnu` or
 `-Dtarget=x86_64-windows-gnu` makes a Linux or Windows binary.
 
-| | macOS | iOS | Linux | Windows |
-|---|---|---|---|---|
-| windows, input, timers | AppKit | UIKit: screens over each other, touch, keyboards | GTK 4, else GTK 3 (loaded with `dlopen`) | Win32 |
-| text | CoreText | CoreText | nanoui's TrueType reader (`src/ui/tt/`) | the same |
-| rendering | Metal | Metal | OpenGL 3.3 in a GtkGLArea; CPU (`src/ui/raster.zig`) without one | CPU, shown by Direct3D 11 (a DXGI flip swap chain; GDI without it) |
-| icons | SF Symbols | SF Symbols | line icons drawn by nanoui (`src/ui/icons.zig`) | the same |
-| pages (webview) | WKWebView | not yet | not yet | not yet |
-| menus | the menu bar | a keyboard's shortcuts | accelerators | accelerators |
-| HTTP (`nanoui.http`) | NSURLSession | NSURLSession | [http-zig](https://github.com/justrach/http-zig): HTTP/2 over TLS, a thread per request | the same |
+| | macOS | iOS | Android | Linux | Windows |
+|---|---|---|---|---|---|
+| windows, input, timers | AppKit | UIKit: screens over each other, touch, keyboards | NativeActivity: screens over each other, touch, keyboards, Back | GTK 4, else GTK 3 (loaded with `dlopen`) | Win32 |
+| text | CoreText | CoreText | nanoui's TrueType reader, Android's fonts | nanoui's TrueType reader (`src/ui/tt/`) | the same |
+| rendering | Metal | Metal | OpenGL ES 3; CPU without it | OpenGL 3.3 in a GtkGLArea; CPU (`src/ui/raster.zig`) without one | CPU, shown by Direct3D 11 (a DXGI flip swap chain; GDI without it) |
+| icons | SF Symbols | SF Symbols | line icons drawn by nanoui (`src/ui/icons.zig`) | the same | the same |
+| pages (webview) | WKWebView | not yet | not yet | not yet | not yet |
+| menus | the menu bar | a keyboard's shortcuts | a keyboard's shortcuts | accelerators | accelerators |
+| HTTP (`nanoui.http`) | NSURLSession | NSURLSession | http-zig, names looked up by Android | [http-zig](https://github.com/justrach/http-zig): HTTP/2 over TLS, a thread per request | the same |
 
 The CPU renderer matches the Metal one pixel for pixel, and a test compares
-them; another compares the OpenGL renderer with the CPU one, in a context
-without a window. `NANOUI_RENDERER=cpu` draws on the CPU where OpenGL is. `zig build test -Dportable=true` runs the Linux and Windows text and
+them; others compare the OpenGL renderer with the CPU one, with OpenGL 3.3
+and with OpenGL ES 3, in a context without a window. `NANOUI_RENDERER=cpu` draws on the CPU where OpenGL is. `zig build test -Dportable=true` runs the Linux and Windows text and
 renderer on a Mac. Linux is also tested in a container
 (`tools/linux.Dockerfile`: GTK 3 and 4, fonts and a virtual display).
 
@@ -421,6 +422,32 @@ reaches those devices.
 
 Not on iOS yet: pages, input methods that compose text (Japanese,
 Chinese), keys repeating while held, and more than one window on an iPad.
+
+### Android
+
+<p align="center"><img src="docs/images/android-gallery.png" width="720" alt="The gallery example on an Android phone in the emulator: its pages as a list, the task list typed into with the software keyboard up, and the list in dark mode"></p>
+
+Native UI runs on Android with Linux's text and renderer, nanoui's TrueType
+reader on Android's fonts and OpenGL ES 3 (or the CPU), on the NDK's
+NativeActivity (`src/android/`). There's no Java of nanoui's own: the app's
+`main` runs on a thread of its own with a looper, and Java's classes are
+called through JNI where Android has no C interface (the clipboard, links,
+dialogs, the software keyboard, the insets). As on iOS, the first window
+fills the screen and windows shown after it cover it; a finger presses,
+scrolls and flings, two pinch, and views are laid out clear of the bars,
+the cutout and the keyboard. Back is Escape for the top window's view
+first (a menu, a sheet or a page closes), then closes the top window, and
+on the last one sends the app to the background. A mouse hovers, clicks
+and scrolls; dark mode, rotation and density follow the system.
+
+```sh
+zig build -Dtarget=aarch64-linux-android               # zig-out/android/Counter.apk, Gallery.apk
+sh tools/android/emulator.sh                           # an emulator without a window
+zig build run-gallery -Dtarget=aarch64-linux-android   # installed and run there (or on a phone), its log here
+```
+
+What you need, an app's build.zig, and what isn't there yet:
+[docs/android.md](docs/android.md).
 
 ## Apps
 
@@ -513,7 +540,7 @@ Rules for working here, by hand or with an agent, are in
 
 nanoui is a subset of what full frameworks offer. Pages work only on macOS so
 far, and there's no accessibility, notifications, channels or plugins yet,
-and bundling only for iOS. Apps update themselves from GitHub releases on macOS
+and bundling only for iOS and Android. Apps update themselves from GitHub releases on macOS
 (`nanoui.Updater`). Bound methods run on the main thread.
 
 ## License

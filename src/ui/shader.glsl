@@ -1,8 +1,9 @@
-// shader.metal and glass.metal in GLSL 3.30, for the OpenGL renderer
-// (opengl.zig), which builds each program from this file with one of
-// QUAD_VS, QUAD_FS, GLASS_FS, PASS_VS, DOWN_FS or BLUR_FS defined. The
-// frame is drawn upside down as GL keeps it (row 0 at the bottom); the
-// instances' points and the backdrop's texels are top down, as in Metal.
+// shader.metal and glass.metal in GLSL 3.30, and GLSL ES 3.00 for OpenGL
+// ES (Android), for the OpenGL renderer (opengl.zig), which builds each
+// program from this file with one of QUAD_VS, QUAD_FS, GLASS_FS, PASS_VS,
+// DOWN_FS or BLUR_FS defined. The frame is drawn upside down as GL keeps
+// it (row 0 at the bottom); the instances' points and the backdrop's
+// texels are top down, as in Metal.
 
 #if defined(QUAD_VS)
 layout(location = 0) in vec4 a_rect;   // x, y, w, h in points
@@ -208,6 +209,10 @@ vec4 shade() {
     if (kind == 3.0) {
         // Premultiplied already: scaled by the corners' coverage and opacity.
         vec4 px = texture(images, v_uv);
+#ifdef GL_ES
+        // BGRA pixels, which OpenGL ES took for RGBA.
+        px = px.bgra;
+#endif
         // Tinted: the picture's shape in one color (a mark following the theme).
         if (i_border_color.a > 0.0) {
             float a = px.a * i_border_color.a * coverage * i_color.a;
