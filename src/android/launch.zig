@@ -43,7 +43,9 @@ pub fn readExtras(env: jni.Env, act: jni.Object, argv: *std.ArrayList([*:0]const
     // Any app may start the launcher activity with any extras: only a
     // debuggable build (a debug APK, adb's) takes them, so another app
     // can't play steps in a release build's window or set its environment.
-    if (debuggable(env, act)) for ([_]bool{ true, false }) |args| {
+    if (!debuggable(env, act)) {
+        if (hasExtras(env, intent)) ndk.log(ndk.LOG_WARN, "nanoui: a release build ignores the intent's arguments and variables, which any app could send: build for debug to pass them");
+    } else for ([_]bool{ true, false }) |args| {
         // String arrays first, then one extra each.
         const k = jni.string(env, if (args) "nanoui.args" else "nanoui.env");
         const array = jni.call(env, intent, "getStringArrayExtra", "(Ljava/lang/String;)[Ljava/lang/String;", &.{jni.ref(k)}) orelse null;
@@ -61,7 +63,7 @@ pub fn readExtras(env: jni.Env, act: jni.Object, argv: *std.ArrayList([*:0]const
             defer jni.deleteLocal(env, value);
             take(env, value, args, argv);
         }
-    };
+    }
     // Where temporary files go: the app's cache (Android sets no TMPDIR).
     if (getenv("TMPDIR") == null) if (cacheDir(env, act)) |dir| {
         defer gpa.free(dir);
@@ -93,6 +95,16 @@ fn cacheDir(env: jni.Env, act: jni.Object) ?[]u8 {
     const file = jni.call(env, act, "getCacheDir", "()Ljava/io/File;", &.{}) orelse return null;
     const path = jni.call(env, file, "getAbsolutePath", "()Ljava/lang/String;", &.{}) orelse return null;
     return jni.fromString(env, std.heap.c_allocator, path) catch null;
+}
+
+/// Whether the intent carries arguments or variables for nanoui.
+fn hasExtras(env: jni.Env, intent: jni.Object) bool {
+    for ([_][]const u8{ "nanoui.args", "nanoui.env", "nanoui.arg.0", "nanoui.env.0" }) |key| {
+        const k = jni.string(env, key);
+        defer jni.deleteLocal(env, k);
+        if (jni.call(env, intent, "hasExtra", "(Ljava/lang/String;)Z", &.{jni.ref(k)}) orelse false) return true;
+    }
+    return false;
 }
 
 /// Whether the app is debuggable (ApplicationInfo.FLAG_DEBUGGABLE).
