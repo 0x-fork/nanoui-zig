@@ -402,11 +402,17 @@ first after `zig build`.
 
 `-Dtarget=aarch64-ios` builds for devices: sign the app with your team
 (Xcode, or `codesign` and a provisioning profile) and install it with
-`xcrun devicectl`. An app bundles itself in its own build.zig:
+`xcrun devicectl`. Zig compiles a device's program and Apple's linker
+(`xcrun clang`) links it: an iPhone refuses a program Zig 0.17.0 links,
+before it runs and without a crash report. An app bundles itself in its
+own build.zig:
 
 ```zig
 const bundle = @import("nanoui").ios.app(b, exe, .{ .name = "Notes", .id = "com.example.notes" });
 ```
+
+An app that makes its own bundle takes its program from
+`ios.executable(b, exe)`.
 
 Zig 0.17 makes iOS 18 the lowest an app runs on unless the target names
 one, and the app's Info.plist follows it. nanoui runs on iOS 15 and
