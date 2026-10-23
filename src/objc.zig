@@ -121,7 +121,9 @@ pub const Pool = struct {
 
 /// An autoreleased NSString copied from `s`.
 pub fn nsString(s: []const u8) Object {
-    const str = msg(Object, alloc("NSString"), "initWithBytes:length:encoding:", .{ s.ptr, s.len, @as(NSUInteger, 4) });
+    const str = msg(?Object, alloc("NSString"), "initWithBytes:length:encoding:", .{ s.ptr, s.len, @as(NSUInteger, 4) }) orelse
+        msg(?Object, alloc("NSString"), "initWithBytes:length:encoding:", .{ s.ptr, s.len, @as(NSUInteger, 5) }) orelse
+        return msg(Object, class("NSString"), "string", .{});
     autorelease(str);
     return str;
 }

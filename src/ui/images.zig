@@ -35,7 +35,7 @@ pub const Decoded = struct {
 };
 
 /// Decoded pictures kept at most (the oldest go first).
-const max_kept_bytes = 24 * 1024 * 1024;
+const max_kept_bytes = 12 * 1024 * 1024;
 
 /// Where packed pictures go instead of `pixels`: the GPU's texture, so no
 /// copy of the atlas is kept in memory (a window on Metal).
@@ -82,22 +82,28 @@ pub const Images = struct {
     resets: u64 = 0,
     /// Emptied during a frame: its earlier pictures must be painted again.
     reset_during_frame: bool = false,
-    decodes_left: u32 = 6,
+    decodes_left: u32 = 8,
     wants_frame: bool = false,
 
     pub fn deinit(im: *Images) void {
         if (im.pixels.len > 0) im.gpa.free(im.pixels);
         im.headers.deinit(im.gpa);
         im.entries.deinit(im.gpa);
-        for (im.decoded.values()) |d| if (d) |x| im.gpa.free(x.bgra);
+        im.trimDecoded();
         im.decoded.deinit(im.gpa);
+    }
+
+    pub fn trimDecoded(im: *Images) void {
+        for (im.decoded.values()) |d| if (d) |x| im.gpa.free(x.bgra);
+        im.decoded.clearRetainingCapacity();
+        im.kept_bytes = 0;
     }
 
     /// Called at the start of `paint`: compacts stale entries before any
     /// instance is emitted when the atlas is filling up.
     pub fn beginPaint(im: *Images) void {
         im.frame +%= 1;
-        im.decodes_left = 6;
+        im.decodes_left = 8;
         im.wants_frame = false;
         if (im.shelf_y + im.shelf_h > size * 3 / 4) im.repackLive();
     }
@@ -106,6 +112,7 @@ pub const Images = struct {
     /// Sizing a picture needs only this: it is decoded and packed when drawn.
     pub fn info(im: *Images, k: u64, bytes: []const u8) ?Info {
         if (im.headers.get(k)) |h| return h;
+        if (im.headers.count() >= 2048) im.headers.clearRetainingCapacity();
         const h = probeHeader(bytes);
         im.headers.put(im.gpa, k, h) catch {};
         return h;

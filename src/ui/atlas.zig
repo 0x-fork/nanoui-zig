@@ -222,8 +222,9 @@ pub const Atlas = struct {
         // AppKit draws the symbol, into color (it can't into a mask), and
         // the mask keeps its coverage: the symbol's CGImage holds only the
         // strokes' outlines on recent macOS.
-        const rgba = a.gpa.alloc(u8, dw * dh * 4) catch return null;
-        defer a.gpa.free(rgba);
+        a.pixels.resize(a.gpa, dw * dh * 5) catch return null;
+        const mask = a.pixels.items[0 .. dw * dh];
+        const rgba = a.pixels.items[dw * dh ..][0 .. dw * dh * 4];
         @memset(rgba, 0);
         const space = cf.CGColorSpaceCreateWithName(cf.kCGColorSpaceSRGB) orelse return null;
         defer cf.CGColorSpaceRelease(space);
@@ -243,8 +244,8 @@ pub const Atlas = struct {
             objc.msg(void, img, "drawInRect:fromRect:operation:fraction:", .{ rect, objc.CGRect{}, @as(objc.NSUInteger, 2), @as(f64, 1) });
             objc.msg(void, objc.class("NSGraphicsContext"), "restoreGraphicsState", .{});
         }
-        a.pixels.resize(a.gpa, dw * dh) catch return null;
-        for (a.pixels.items, 0..) |*m, i| m.* = rgba[i * 4 + 3];
+        for (mask, 0..) |*m, i| m.* = rgba[i * 4 + 3];
+        a.pixels.shrinkRetainingCapacity(dw * dh);
         const origin = a.allocate(dw, dh) orelse blk: {
             a.makeRoom();
             break :blk a.allocate(dw, dh) orelse return null;

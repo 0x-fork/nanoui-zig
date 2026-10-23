@@ -41,24 +41,12 @@ pub fn warmCaches(ts: *TextSystem) void {
     if (ts.wraps.current.capacity() < 4096) ts.wraps.current.ensureTotalCapacity(ts.gpa, 4096) catch {};
     if (ts.atlas.sprites.capacity() < 4096) ts.atlas.sprites.ensureTotalCapacity(ts.gpa, 4096) catch {};
     if (ts.atlas.symbols.capacity() < 512) ts.atlas.symbols.ensureTotalCapacity(ts.gpa, 512) catch {};
+    if (!portable and ts.atlas.pixels.capacity < 16384) ts.atlas.pixels.ensureTotalCapacity(ts.gpa, 16384) catch {};
 }
 
 /// Retains recently shaped layouts across frames up to `max_layouts` so
 /// scrolling and search filtering do not re-allocate glyph slices on steady frames.
-pub fn retainLayouts(ts: *TextSystem) void {
-    if (ts.previous.count() == 0) return;
-    var it = ts.previous.iterator();
-    while (it.next()) |kv| {
-        if (ts.layouts.contains(kv.key_ptr.*) or ts.layouts.count() >= max_layouts) {
-            ts.gpa.free(kv.value_ptr.glyphs);
-        } else {
-            ts.layouts.put(ts.gpa, kv.key_ptr.*, kv.value_ptr.*) catch {
-                ts.gpa.free(kv.value_ptr.glyphs);
-            };
-        }
-    }
-    ts.previous.clearRetainingCapacity();
-}
+pub fn retainLayouts(_: *TextSystem) void {}
 
 fn cutKey(s: []const u8, style: types.TextStyle, zoom: f32, room: f32, mode: u2) u64 {
     const q_room: u64 = @intFromFloat(@round(@max(0, @min(room, 1e6)) * 2.0));

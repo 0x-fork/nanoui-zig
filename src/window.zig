@@ -338,7 +338,8 @@ fn willFullScreen(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.
 fn fullScreenChanged(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) void {
     const w = objc.getZig(Window, self_obj) orelse return;
     if (w.on_fullscreen) |cb| cb.func(cb.ctx, w);
-    if (w.surface) |s| {
+    const w2 = objc.getZig(Window, self_obj) orelse return;
+    if (w2.surface) |s| {
         s.updateGeometry();
         s.frame();
     }
@@ -351,7 +352,8 @@ fn keyChanged(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) v
         w.resigned_at = CACurrentMediaTime();
     }
     if (w.on_key) |cb| cb.func(cb.ctx, w);
-    if (w.surface) |s| if (s.visible()) s.requestFrame() else s.frame();
+    const w2 = objc.getZig(Window, self_obj) orelse return;
+    if (w2.surface) |s| if (s.visible()) s.requestFrame() else s.frame();
 }
 
 fn shouldClose(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) objc.BOOL {

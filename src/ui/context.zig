@@ -413,7 +413,6 @@ pub const Context = struct {
             for (stale[0..n]) |k| _ = c.memory.remove(k);
         }
         c.motion.prune(c.frame);
-        if (c.text_warmed) text.retainLayouts(c.text);
         if (@hasField(@TypeOf(c.text.images), "wants_frame") and c.text.images.wants_frame) c.animationFrame();
     }
 
@@ -445,6 +444,7 @@ pub const Context = struct {
         c.selection.next_order.ensureTotalCapacity(c.gpa, 1024) catch {};
         c.selection.lines.ensureTotalCapacity(c.gpa, 1024) catch {};
         c.truncates.ensureTotalCapacity(c.gpa, 4096) catch {};
+        _ = c.arena.allocator().alloc(u8, 64 * 1024) catch {};
     }
 
     fn childId(c: *Context, key: ?[]const u8) u64 {

@@ -105,9 +105,12 @@ pub const TextSystem = struct {
 
     fn dropCaches(self: *TextSystem) void {
         self.fonts.clearRetainingCapacity();
+        self.run_fonts.clearRetainingCapacity();
+        self.run_faces.clearRetainingCapacity();
         freeLayouts(self.gpa, &self.layouts);
         freeLayouts(self.gpa, &self.previous);
         self.wraps.clear(self.gpa);
+        self.atlas.reset();
     }
 
     /// Scales every text by `z`: a change drops every cached font, shaping and wrap.
@@ -124,8 +127,10 @@ pub const TextSystem = struct {
 
     pub fn beginFrame(self: *TextSystem) void {
         self.atlas.reset_during_frame = false;
-        freeLayouts(self.gpa, &self.previous);
-        std.mem.swap(std.AutoHashMapUnmanaged(u64, Layout), &self.layouts, &self.previous);
+        if (self.layouts.count() >= 4096) {
+            freeLayouts(self.gpa, &self.previous);
+            std.mem.swap(std.AutoHashMapUnmanaged(u64, Layout), &self.layouts, &self.previous);
+        }
         self.wraps.beginFrame(self.gpa);
     }
 
