@@ -106,3 +106,35 @@ test "inline code at the text's own size when mono_scale is 1" {
     // Ten percent larger, to the pixel's rounding.
     try testing.expect(widths[1] > widths[0] * 1.07);
 }
+
+test "scripts click at points, press combinations and write frames as they go" {
+    const S = ui.Shortcut;
+    try testing.expectEqual(S{ .key = 'n', .cmd = true, .shift = true }, S.parse("cmd+shift+N").?);
+    try testing.expectEqual(S{ .key = S.enter, .cmd = true }, S.parse("cmd+enter").?);
+    try testing.expectEqual(S{ .key = '1', .cmd = true }, S.parse("cmd+1").?);
+    try testing.expect(S.parse("cmd+") == null);
+    const Pad = struct {
+        n: i32 = 0,
+        news: i32 = 0,
+        fn view(p: *@This(), c: *ui.Context) void {
+            if (c.shortcut(.{ .key = 'n', .cmd = true })) p.news += 1;
+            const b = ui.div(c).w(40).h(40).bg(.hex(0x336699));
+            defer b.end();
+            if (b.clicked()) p.n += 1;
+        }
+    };
+    var p: Pad = .{};
+    var t: ui.Tester = undefined;
+    try t.init(testing.allocator, .init(&p, Pad.view), .{ .width = 100, .height = 100 });
+    defer t.deinit();
+    var dir = testing.tmpDir(.{});
+    defer dir.cleanup();
+    var buf: [512]u8 = undefined;
+    const real = try dir.dir.realPathFile(std.testing.io, ".", &buf);
+    var script_buf: [700]u8 = undefined;
+    const script = try std.fmt.bufPrint(&script_buf, "at:20,20;chord:cmd+n;snap:{s}/one.png;hover:90,90;at:80,80", .{buf[0..real]});
+    try t.runScript(script);
+    try testing.expectEqual(@as(i32, 1), p.n);
+    try testing.expectEqual(@as(i32, 1), p.news);
+    _ = try dir.dir.statFile(std.testing.io, "one.png", .{});
+}
