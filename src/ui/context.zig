@@ -37,6 +37,9 @@ pub const Content = union(enum) {
         opacity: f32 = 1,
         /// Its shape (alpha) filled with this color: a monochrome mark.
         tint: ?types.Color = null,
+        /// Drawn on whole pixels: a picture made at the screen's own
+        /// size (an icon from SVG), so nothing blurs it.
+        snap: bool = false,
     };
 
     pub const Icon = struct {

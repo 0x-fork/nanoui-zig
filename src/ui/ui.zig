@@ -43,6 +43,7 @@ pub const Edges = types.Edges;
 pub const Length = types.Length;
 pub const Style = types.Style;
 pub const TextStyle = types.TextStyle;
+pub const Truncate = types.Truncate;
 pub const Shadow = types.Shadow;
 pub const Glass = types.Glass;
 pub const Weight = types.Weight;
@@ -65,6 +66,10 @@ pub const Stroke = @import("draw.zig").Stroke;
 pub const triangulate = @import("draw.zig").triangulate;
 pub const Texture = @import("gpu.zig").Texture;
 pub const ImageOptions = widgets.ImageOptions;
+pub const svg = widgets.svg;
+/// A font the app brings, found by family name (`Theme.font`, …).
+pub const registerFont = @import("font_registry.zig").register;
+pub const SvgOptions = widgets.SvgOptions;
 pub const text = widgets.text;
 pub const textf = widgets.textf;
 pub const richText = widgets.richText;
@@ -148,6 +153,9 @@ test {
     _ = @import("png.zig");
     _ = @import("png_decode.zig");
     _ = @import("images.zig");
+    _ = @import("svg.zig");
+    _ = @import("tests_svg.zig");
+    _ = @import("tests_truncate.zig");
     _ = @import("icons.zig");
     _ = keys;
 }

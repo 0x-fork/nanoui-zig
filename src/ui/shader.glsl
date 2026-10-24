@@ -197,6 +197,8 @@ vec4 shade() {
     if (kind == 7.0) return triangle_color();
     if (kind == 1.0) {
         float a = texture(atlas, v_uv).r * i_color.a;
+        // A truncated line fading out: `border_width` points before `radius`.
+        if (i_misc.y > 0.0) a *= clamp((i_misc.x - v_world.x) / i_misc.y, 0.0, 1.0);
         return vec4(i_color.rgb * a, a);
     }
     vec2 half_size = i_rect.zw * 0.5;

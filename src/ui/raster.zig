@@ -311,7 +311,9 @@ fn glyph(out: gpu.Pixels, i: *const gpu.Instance, mask: Mask, scale: f32, b: [4]
             const wx = (@as(f32, @floatFromInt(x)) + 0.5) * inv;
             const tx = (wx - i.rect[0]) / i.rect[2];
             const u = i.uv[0] + (i.uv[2] - i.uv[0]) * tx;
-            const a = sample(mask, u, v) * c[3] * clipCover(i, wx, wy, inv);
+            var a = sample(mask, u, v) * c[3] * clipCover(i, wx, wy, inv);
+            // A truncated line fading out, as the shader fades it.
+            if (i.border_width > 0) a *= std.math.clamp((i.radius - wx) / i.border_width, 0, 1);
             blend(out.bytes, row + x * 4, c[0] * a, c[1] * a, c[2] * a, a);
         }
     }
