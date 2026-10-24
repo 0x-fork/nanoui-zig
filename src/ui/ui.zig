@@ -67,6 +67,8 @@ pub const triangulate = @import("draw.zig").triangulate;
 pub const Texture = @import("gpu.zig").Texture;
 pub const ImageOptions = widgets.ImageOptions;
 pub const svg = widgets.svg;
+/// A font the app brings, found by family name (`Theme.font`, …).
+pub const registerFont = @import("font_registry.zig").register;
 pub const SvgOptions = widgets.SvgOptions;
 pub const text = widgets.text;
 pub const textf = widgets.textf;
