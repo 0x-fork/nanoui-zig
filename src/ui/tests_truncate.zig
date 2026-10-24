@@ -138,3 +138,26 @@ test "scripts click at points, press combinations and write frames as they go" {
     try testing.expectEqual(@as(i32, 1), p.news);
     _ = try dir.dir.statFile(std.testing.io, "one.png", .{});
 }
+
+test "a text buffer asked for focus gives its field the keyboard" {
+    const Form = struct {
+        a: ui.TextBuffer = .{},
+        b: ui.TextBuffer = .{},
+        fn view(f: *@This(), c: *ui.Context) void {
+            const col = ui.div(c).column().p(10).gap(8);
+            defer col.end();
+            _ = ui.textField(c, &f.a, .{});
+            _ = ui.textField(c, &f.b, .{});
+        }
+    };
+    var f: Form = .{};
+    var t: ui.Tester = undefined;
+    try t.init(testing.allocator, .init(&f, Form.view), .{ .width = 300, .height = 120 });
+    defer t.deinit();
+    t.settle(1);
+    f.b.focus();
+    t.frame();
+    t.typeText("hi");
+    try testing.expectEqualStrings("", f.a.text());
+    try testing.expectEqualStrings("hi", f.b.text());
+}
