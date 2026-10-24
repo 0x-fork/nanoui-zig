@@ -67,10 +67,14 @@ pub const Flattener = struct {
         f.subpaths.deinit(f.gpa);
     }
 
+    /// Empties it for the next shape, its pen back at the origin: a path's
+    /// first `m` is absolute, whatever the shape before ended on.
     pub fn clear(f: *Flattener) void {
         f.points.clearRetainingCapacity();
         f.subpaths.clearRetainingCapacity();
         f.open = false;
+        f.pen = .{ 0, 0 };
+        f.begin = .{ 0, 0 };
     }
 
     pub fn moveTo(f: *Flattener, p: Point) !void {

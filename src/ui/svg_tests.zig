@@ -61,3 +61,15 @@ test "a wide viewBox is centered in a square picture, and what can't be drawn is
     try testing.expectEqual(@as(u8, 128), alphaAt(px, 20, 10, 10));
     try testing.expectEqual(@as(u8, 0), alphaAt(px, 20, 10, 17));
 }
+
+test "each path starts at the origin: a first relative moveto is absolute" {
+    // graff's mark: a filled ring, then brackets stroked from `m12 12`.
+    const src =
+        \\<svg viewBox="0 0 32 32" fill="none"><path fill="currentColor" d="M2 2h4v4H2z"/>
+        \\<path stroke="currentColor" stroke-width="2" d="m12 12-4 4 4 4"/></svg>
+    ;
+    const px = try svg.render(testing.allocator, src, .{ .width = 32, .height = 32 });
+    defer testing.allocator.free(px);
+    // The bracket's tip at (8, 16).
+    try testing.expect(alphaAt(px, 32, 8, 16) > 200);
+}
