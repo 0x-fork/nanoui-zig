@@ -200,9 +200,45 @@ fn paintText(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, n: ct
             const y = inner.y + lh * @as(f32, @floatFromInt(i));
             textRun(c, out, t, l.start, l.end, inner.x, y, f, lh, clip4, opacity, sel);
         }
+    } else if (t.style.truncate != .none) {
+        truncated(c, out, t, inner, f, lh, clip4, opacity, sel);
     } else {
         textRun(c, out, t, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel);
     }
+}
+
+/// Where a truncated line ends, and over how many points it fades out
+/// before that (0: cut there).
+const Limit = struct { end: f32, fade: f32 = 0 };
+
+/// A line that may be longer than its box: whole if it fits; else cut at a
+/// glyph before an ellipsis, or drawn to the box's end, fading out.
+fn truncated(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.Text, inner: types.Rect, f: text_mod.Font, lh: f32, clip4: [4]f32, opacity: f32, sel: ?Sel) void {
+    const lay = c.text.layout(t.str, t.style);
+    if (lay.width <= inner.w + 0.5) return textRun(c, out, t, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel);
+    if (t.style.truncate == .fade) {
+        const limit: Limit = .{ .end = inner.x + inner.w, .fade = @min(t.style.fade_width, inner.w / 2) };
+        return textRunLimit(c, out, t, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel, limit);
+    }
+    const ellipsis = "\u{2026}";
+    const room = inner.w - c.text.width(ellipsis, t.style);
+    // The last glyph boundary that leaves room for the ellipsis, before
+    // any spaces there.
+    var cut: usize = 0;
+    var cut_x: f32 = 0;
+    for (lay.glyphs) |g| {
+        if (g.x > room) break;
+        cut = g.index;
+        cut_x = g.x;
+    }
+    while (cut > 0 and t.str[cut - 1] == ' ') cut -= 1;
+    if (cut > 0) cut_x = c.text.layout(t.str[0..cut], t.style).width;
+    const limit: Limit = .{ .end = inner.x + inner.w };
+    if (cut > 0) textRunLimit(c, out, t, 0, cut, inner.x, inner.y, f, lh, clip4, opacity, sel, limit);
+    var dots = t;
+    dots.str = ellipsis;
+    dots.spans = &.{};
+    textRunLimit(c, out, dots, 0, ellipsis.len, inner.x + cut_x, inner.y, f, lh, clip4, opacity, null, limit);
 }
 
 /// Draws bytes [start, end) of `t`, each glyph in its span's color.
@@ -211,6 +247,10 @@ fn paintText(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, n: ct
 const Sel = struct { id: u64, index: u32, x0: f32, x1: f32 };
 
 fn textRun(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.Text, start: usize, end: usize, x: f32, y: f32, f: text_mod.Font, lh: f32, clip4: [4]f32, opacity: f32, sel: ?Sel) void {
+    textRunLimit(c, out, t, start, end, x, y, f, lh, clip4, opacity, sel, null);
+}
+
+fn textRunLimit(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.Text, start: usize, end: usize, x: f32, y: f32, f: text_mod.Font, lh: f32, clip4: [4]f32, opacity: f32, sel: ?Sel, limit: ?Limit) void {
     const style = t.style;
     // Cull lines wholly above or below the clip before shaping them; a
     // selectable one still counts for where the pointer is.
@@ -234,6 +274,7 @@ fn textRun(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.
     for (lay.glyphs) |g| {
         const pen = (x + g.x) * scale;
         if (pen / scale > clip4[2]) break;
+        if (limit) |l| if (pen / scale >= l.end) break;
         const px = @floor(pen);
         const bin: u8 = @intFromFloat(@min(text_mod.subpixel_bins - 1, @floor((pen - px) * text_mod.subpixel_bins)));
         const sp = c.text.glyph(g, bin) orelse continue;
@@ -255,7 +296,11 @@ fn textRun(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.
             .color = color,
             .uv = sp.uv,
             .kind = metal.Kind.text,
-            .clip = clip4,
+            // A fading line: its glyphs fade out toward `end`, and are
+            // cut there (the shader reads these for glyphs).
+            .radius = if (limit) |l| l.end else 0,
+            .border_width = if (limit) |l| l.fade else 0,
+            .clip = if (limit) |l| .{ clip4[0], clip4[1], @min(clip4[2], l.end), clip4[3] } else clip4,
         });
     }
 }

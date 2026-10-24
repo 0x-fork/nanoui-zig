@@ -218,7 +218,14 @@ pub const TextStyle = struct {
     italic: bool = false,
     /// Line height as a multiple of the font's (1.5 for airy prose).
     leading: f32 = 1,
+    /// A line longer than its box (text that doesn't wrap): cut before an
+    /// ellipsis, or faded out over its last `fade_width` points. Such text
+    /// gives room back in a row, as wrapping text does.
+    truncate: Truncate = .none,
+    fade_width: f32 = 24,
 };
+
+pub const Truncate = enum { none, ellipsis, fade };
 
 test "rect" {
     const r: Rect = .{ .x = 10, .y = 10, .w = 100, .h = 50 };

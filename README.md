@@ -136,7 +136,8 @@ the state.
   `ui.div(c).row().gap(8).bg(...)`.
 - **Lists:** a virtualized list (`ui.list`) that builds only the rows in view.
 - **Text:** wrapping, monospace, weights and rich spans, with text that can
-  be selected and copied like a terminal's.
+  be selected and copied like a terminal's; lines too long for their box
+  end in an ellipsis or fade out (`.truncate`).
 - **Controls:** buttons, checkboxes, toggles, sliders, progress bars,
   segmented controls, badges, and text fields with IME support.
 - **Images:** pictures decoded once and packed into an atlas.

@@ -43,6 +43,7 @@ pub const Edges = types.Edges;
 pub const Length = types.Length;
 pub const Style = types.Style;
 pub const TextStyle = types.TextStyle;
+pub const Truncate = types.Truncate;
 pub const Shadow = types.Shadow;
 pub const Glass = types.Glass;
 pub const Weight = types.Weight;
@@ -152,6 +153,7 @@ test {
     _ = @import("images.zig");
     _ = @import("svg.zig");
     _ = @import("tests_svg.zig");
+    _ = @import("tests_truncate.zig");
     _ = @import("icons.zig");
     _ = keys;
 }

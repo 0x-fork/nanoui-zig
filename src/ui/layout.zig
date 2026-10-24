@@ -49,6 +49,11 @@ pub fn measure(c: *Context, index: u32, avail_w: f32) types.Size {
                 const w = if (rich.styled(t.spans)) rich.layout(c.text, t.str, t.style, t.spans, 0).width else c.text.width(t.str, t.style);
                 content.w = @ceil(w);
                 content.h = lh;
+                // Truncating text fits the room it's given.
+                if (t.style.truncate != .none) {
+                    content.w = @min(content.w, inner_w);
+                    flexible = true;
+                }
             }
         },
         .icon => |ic| {

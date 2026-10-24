@@ -180,6 +180,8 @@ static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float
     if (i.kind == 1.0) {
         constexpr sampler s(filter::linear, address::clamp_to_edge);
         float a = atlas.sample(s, in.uv).r * i.color.a;
+        // A truncated line fading out: `border_width` points before `radius`.
+        if (i.border_width > 0.0) a *= clamp((i.radius - in.world.x) / i.border_width, 0.0, 1.0);
         return float4(i.color.rgb * a, a);
     }
 
