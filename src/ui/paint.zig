@@ -121,7 +121,7 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
                 });
             },
             .image => |im| if (c.text.images.get(im.key, im.bytes)) |e| push(c, out, .{
-                .rect = rect4,
+                .rect = if (im.snap) .{ snap(r.x, c.scale), snap(r.y, c.scale), r.w, r.h } else rect4,
                 .color = .{ 1, 1, 1, im.opacity * opacity },
                 // A tint (alpha above 0) fills the picture's shape instead.
                 .border_color = if (im.tint) |t| metal.color4(t) else .{ 0, 0, 0, 0 },

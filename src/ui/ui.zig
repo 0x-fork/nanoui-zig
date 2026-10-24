@@ -65,6 +65,8 @@ pub const Stroke = @import("draw.zig").Stroke;
 pub const triangulate = @import("draw.zig").triangulate;
 pub const Texture = @import("gpu.zig").Texture;
 pub const ImageOptions = widgets.ImageOptions;
+pub const svg = widgets.svg;
+pub const SvgOptions = widgets.SvgOptions;
 pub const text = widgets.text;
 pub const textf = widgets.textf;
 pub const richText = widgets.richText;
@@ -148,6 +150,8 @@ test {
     _ = @import("png.zig");
     _ = @import("png_decode.zig");
     _ = @import("images.zig");
+    _ = @import("svg.zig");
+    _ = @import("tests_svg.zig");
     _ = @import("icons.zig");
     _ = keys;
 }
