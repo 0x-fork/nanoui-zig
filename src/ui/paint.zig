@@ -194,7 +194,7 @@ fn paintText(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, n: ct
     const sel: ?Sel = if (selectable) .{ .id = n.id, .index = index, .x0 = n.rect.x, .x1 = n.rect.x + n.rect.w } else null;
     const inner = n.rect.inset(n.style.padding);
     const f = c.text.font(t.style);
-    const lh = if (t.style.leading == 1) f.lineHeight() else @ceil(f.lineHeight() * t.style.leading);
+    const lh = c.text.lineHeight(t.style);
     if (t.style.wrap) {
         for (t.lines, 0..) |l, i| {
             const y = inner.y + lh * @as(f32, @floatFromInt(i));

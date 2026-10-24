@@ -218,6 +218,9 @@ pub const TextStyle = struct {
     italic: bool = false,
     /// Line height as a multiple of the font's (1.5 for airy prose).
     leading: f32 = 1,
+    /// Line height in points (CSS's `line-height: 22px`), taking the place
+    /// of `leading` when above 0; the extra room goes half above, half below.
+    line_height: f32 = 0,
     /// A line longer than its box (text that doesn't wrap): cut before an
     /// ellipsis, or faded out over its last `fade_width` points. Such text
     /// gives room back in a row, as wrapping text does.

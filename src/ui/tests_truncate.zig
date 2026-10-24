@@ -60,3 +60,23 @@ test "a long line fades out or ends in an ellipsis, and what follows it stays wh
         if (how == .fade) try testing.expect(near_end < 80) else try testing.expect(near_end > 100);
     }
 }
+
+test "a line height in points spaces wrapped lines exactly" {
+    const Para = struct {
+        fn view(_: *@This(), c: *ui.Context) void {
+            const col = ui.div(c).column().w(120).p(0);
+            defer col.end();
+            ui.text(c, "one two three four five six seven eight nine ten", .{ .size = 14, .line_height = 22, .wrap = true });
+        }
+    };
+    var p: Para = .{};
+    var t: ui.Tester = undefined;
+    try t.init(testing.allocator, .init(&p, Para.view), .{ .width = 200, .height = 200 });
+    defer t.deinit();
+    t.settle(1);
+    for (t.ctx.nodes.items) |n| if (n.content == .text) {
+        const lines: f32 = @floatFromInt(n.content.text.lines.len);
+        try testing.expect(lines >= 3);
+        try testing.expectEqual(22 * lines, n.rect.h);
+    };
+}

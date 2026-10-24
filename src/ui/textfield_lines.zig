@@ -76,7 +76,7 @@ pub const Drawn = struct {
 /// keep the caret in view within `view_h`; else where the wheel left it.
 pub fn draw(c: *Context, s: []const u8, e: *EditState, style: types.TextStyle, lines: []const Line, view_h: f32, focused: bool, follow: bool, block: bool, placeholder: []const u8, suggestion: []const u8) Drawn {
     const th = c.theme;
-    const lh = c.text.font(style).lineHeight();
+    const lh = c.text.lineHeight(style);
     const k = lineOf(lines, e.caret);
     const cx = caretX(c, s, style, lines[k], e.caret);
     const cy = @as(f32, @floatFromInt(k)) * lh;

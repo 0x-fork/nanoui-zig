@@ -301,7 +301,7 @@ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
     e.anchor = @min(e.anchor, buffer.len);
     // A multiline field wraps at last frame's width (unknown at first).
     const wrap_w: f32 = if (it.rect) |r| @max(1, r.w - 2 * pad_x) else 1e6;
-    const lh_ = c.text.font(style).lineHeight();
+    const lh_ = c.text.lineHeight(style);
     // Where the wheel scrolled a multiline field; the caret before edits.
     if (multi) if (c.scroll.get(it.id)) |v| {
         e.scroll_y = v;
@@ -454,7 +454,7 @@ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
         return result;
     }
     const shown = shownOf(s, opts.password, bullets);
-    const lh = c.text.font(style).lineHeight();
+    const lh = c.text.lineHeight(style);
     const caret_x = c.text.caretX(shown, style, shownIndex(s, opts.password, e.caret));
     // Keep the caret in view.
     const view_w = if (it.rect) |r| @max(0, r.w - 2 * pad_x) else 0;
