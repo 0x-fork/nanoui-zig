@@ -62,7 +62,7 @@ test "a motion click and its animated frames draw through a hidden Windows surfa
     s.frame();
     try testing.expect(p.open);
     for (0..120) |_| {
-        std.Thread.sleep(16 * std.time.ns_per_ms);
+        std.Io.sleep(std.Io.Threaded.global_single_threaded.io(), .fromMilliseconds(16), .awake) catch {};
         s.frame();
         s.pixels.draw(gpa, .{
             .instances = s.instances.items,
