@@ -222,11 +222,14 @@ static float4 shade(VOut in, Instance i, texture2d<float> atlas, texture2d<float
 
     float aa = max(fwidth(d), 0.0001) * 0.5;
     float coverage = 1.0 - smoothstep(-aa, aa, d);
-    float4 c = i.color;
+    // Premultiplied: the border is laid over the fill, not mixed with it.
+    // Mixing an opaque fill with a faint border straight made the pixels
+    // between them light and nearly opaque, a bright rim round each corner.
+    float4 c = float4(i.color.rgb * i.color.a, i.color.a);
     if (i.border_width > 0.0 && i.border_color.a > 0.0) {
         float inner = smoothstep(-i.border_width - aa, -i.border_width + aa, d);
-        c = mix(c, i.border_color, inner);
+        float4 b = float4(i.border_color.rgb * i.border_color.a, i.border_color.a);
+        c = mix(c, b + c * (1.0 - b.a), inner);
     }
-    float a = c.a * coverage;
-    return float4(c.rgb * a, a);
+    return c * coverage;
 }

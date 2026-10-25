@@ -263,13 +263,15 @@ fn quad(out: gpu.Pixels, i: *const gpu.Instance, scale: f32, b: [4]usize) void {
             const aa = @max(sd[1] * inv, 0.0001) * 0.5;
             const coverage = 1 - smoothstep(-aa, aa, sd[0]);
             if (coverage <= 0) continue;
-            var col = c;
+            // Premultiplied: the border is laid over the fill (shader.metal).
+            var col: [4]f32 = .{ c[0] * c[3], c[1] * c[3], c[2] * c[3], c[3] };
             if (has_border) {
                 const t = smoothstep(-bw - aa, -bw + aa, sd[0]);
-                for (0..4) |k| col[k] = c[k] + (bc[k] - c[k]) * t;
+                const edge: [4]f32 = .{ bc[0] * bc[3], bc[1] * bc[3], bc[2] * bc[3], bc[3] };
+                for (0..4) |k| col[k] += (edge[k] + col[k] * (1 - edge[3]) - col[k]) * t;
             }
-            const a = col[3] * coverage * cut;
-            blend(out.bytes, row + x * 4, col[0] * a, col[1] * a, col[2] * a, a);
+            const m = coverage * cut;
+            blend(out.bytes, row + x * 4, col[0] * m, col[1] * m, col[2] * m, col[3] * m);
         }
     }
 }

@@ -227,14 +227,15 @@ vec4 shade() {
         float a = shadow_alpha(p, half_size, r, sigma) * i_color.a;
         return vec4(i_color.rgb * a, a);
     }
-    vec4 c = i_color;
+    // Premultiplied: the border is laid over the fill (see shader.metal).
+    vec4 c = vec4(i_color.rgb * i_color.a, i_color.a);
     float bw = i_misc.y;
     if (bw > 0.0 && i_border_color.a > 0.0) {
         float inner = smoothstep(-bw - aa, -bw + aa, d);
-        c = mix(c, i_border_color, inner);
+        vec4 b = vec4(i_border_color.rgb * i_border_color.a, i_border_color.a);
+        c = mix(c, b + c * (1.0 - b.a), inner);
     }
-    float a = c.a * coverage;
-    return vec4(c.rgb * a, a);
+    return c * coverage;
 }
 
 void main() {

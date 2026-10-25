@@ -148,6 +148,7 @@ test {
     _ = @import("glass.zig");
     _ = @import("tests_glass.zig");
     _ = @import("tests_overlay_bar.zig");
+    _ = @import("tests_border.zig");
     if (@import("builtin").os.tag == .linux) _ = @import("tests_opengl.zig");
     _ = @import("tt/raster.zig");
     _ = @import("tt/tests.zig");
