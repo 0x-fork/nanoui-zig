@@ -393,3 +393,7 @@ pub const Surface = struct {
         return true;
     }
 };
+
+test {
+    _ = @import("tests_surface.zig");
+}
