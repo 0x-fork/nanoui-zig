@@ -138,6 +138,13 @@ pub const Tester = struct {
         t.frame();
     }
 
+    /// A right-click at (x, y): a box's context menu.
+    pub fn secondaryClick(t: *Tester, x: f32, y: f32) void {
+        t.moveTo(x, y);
+        t.ctx.secondaryDown();
+        t.frame();
+    }
+
     pub fn drag(t: *Tester, x1: f32, y1: f32, x2: f32, y2: f32) void {
         t.moveTo(x1, y1);
         t.ctx.pointerDown();

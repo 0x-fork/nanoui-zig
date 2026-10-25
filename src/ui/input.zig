@@ -149,6 +149,10 @@ pub const Input = struct {
     /// The button went down / up in this event.
     pressed: bool = false,
     released: bool = false,
+    /// The secondary button went down in this event: the right one, or a
+    /// Control-click on the Mac. It isn't a press (`pressed` stays false):
+    /// it asks for a box's context menu (`Div.secondaryClicked`).
+    secondary: bool = false,
     click_count: u32 = 0,
     scroll: types.Point = .{},
     /// A pinch in this event (two fingers on a touch screen, a trackpad's
@@ -178,6 +182,7 @@ pub const Input = struct {
     pub fn clearEdges(i: *Input) void {
         i.pressed = false;
         i.released = false;
+        i.secondary = false;
         i.scroll = .{};
         i.zoom = 1;
         i.pan = .{};
