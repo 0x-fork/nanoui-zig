@@ -247,7 +247,9 @@ pub const TextSystem = struct {
         return x;
     }
 
-    pub fn glyph(self: *TextSystem, g: Glyph, bin: u8) ?Sprite {
+    /// Strokes aren't thickened here: `dilation` is for macOS's look.
+    pub fn glyph(self: *TextSystem, g: Glyph, bin: u8, dilation: u8) ?Sprite {
+        _ = dilation;
         if (g.font >= self.run_fonts.items.len) return null;
         return self.atlas.glyph(g.font, self.run_fonts.items[g.font], g.glyph, bin);
     }
@@ -255,6 +257,11 @@ pub const TextSystem = struct {
     pub fn positions(self: *TextSystem, g: Glyph) u8 {
         if (g.font >= self.run_fonts.items.len) return 4;
         return self.atlas.positions(g.font, self.run_fonts.items[g.font]);
+    }
+
+    pub fn dilationFor(r: f32, g: f32, b: f32) u8 {
+        _ = .{ r, g, b };
+        return 0;
     }
 
     pub fn width(self: *TextSystem, s: []const u8, style: types.TextStyle) f32 {

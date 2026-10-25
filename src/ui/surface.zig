@@ -290,6 +290,7 @@ const view_methods = [_]objc.Method{
                 .{ .name = "acceptsFirstMouse:", .imp = &yes1, .types = "c@:@" },
                 .{ .name = "mouseDown:", .imp = &mouseDown, .types = "v@:@" },
                 .{ .name = "mouseUp:", .imp = &mouseUp, .types = "v@:@" },
+                .{ .name = "rightMouseDown:", .imp = &rightMouseDown, .types = "v@:@" },
                 .{ .name = "mouseDragged:", .imp = &mouseDragged, .types = "v@:@" },
                 .{ .name = "mouseMoved:", .imp = &mouseMoved, .types = "v@:@" },
                 .{ .name = "mouseExited:", .imp = &mouseExited, .types = "v@:@" },
@@ -324,6 +325,11 @@ fn mouseDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) voi
     _ = objc.msg(objc.BOOL, s.window.nswindow, "makeFirstResponder:", .{obj});
     s.setMouse(event);
     s.ctx.updateHot();
+    // A Control-click is the Mac's secondary click.
+    if (s.ctx.input.ctrl) {
+        s.ctx.secondaryDown();
+        return s.frame();
+    }
     s.ctx.input.click_count = @intCast(objc.msg(objc.NSInteger, event, "clickCount", .{}));
     // Under a hidden title bar, the top strip moves the window as a title bar would.
     if (s.window.title_bar == .hidden and s.ctx.input.mouse.y < s.ctx.title_bar_height and s.ctx.hot == 0) {
@@ -331,6 +337,14 @@ fn mouseDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) voi
         return;
     }
     s.ctx.pointerDown();
+    s.frame();
+}
+
+fn rightMouseDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
+    const s = surfaceOf(obj) orelse return;
+    s.setMouse(event);
+    s.ctx.updateHot();
+    s.ctx.secondaryDown();
     s.frame();
 }
 
