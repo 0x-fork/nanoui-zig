@@ -173,7 +173,7 @@ pub const TextSystem = struct {
         var h = std.hash.Wyhash.init(extra);
         h.update(s);
         h.update(std.mem.asBytes(&style.size));
-        h.update(&.{ @intFromEnum(style.weight), @intFromBool(style.mono), @intFromBool(style.italic) });
+        h.update(&.{ @backingInt(style.weight), @intFromBool(style.mono), @intFromBool(style.italic) });
         return h.final();
     }
 
@@ -250,6 +250,11 @@ pub const TextSystem = struct {
     pub fn glyph(self: *TextSystem, g: Glyph, bin: u8) ?Sprite {
         if (g.font >= self.run_fonts.items.len) return null;
         return self.atlas.glyph(g.font, self.run_fonts.items[g.font], g.glyph, bin);
+    }
+
+    pub fn positions(self: *TextSystem, g: Glyph) u8 {
+        if (g.font >= self.run_fonts.items.len) return 4;
+        return self.atlas.positions(g.font, self.run_fonts.items[g.font]);
     }
 
     pub fn width(self: *TextSystem, s: []const u8, style: types.TextStyle) f32 {

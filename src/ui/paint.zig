@@ -5,6 +5,7 @@ const types = @import("types.zig");
 const metal = @import("gpu.zig");
 const glass = @import("glass.zig");
 const text_mod = @import("text.zig");
+const native_windows = @import("dwrite.zig").enabled;
 const rich = text_mod.rich;
 const ctx_mod = @import("context.zig");
 const Context = ctx_mod.Context;
@@ -107,7 +108,7 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
         });
         switch (n.content) {
             .text => |t| paintText(c, out, index, n, t, clip4, opacity, selectable),
-            .icon => |ic| if (c.text.atlas.symbol(ic.name, ic.size, @intFromEnum(ic.weight))) |sp| {
+            .icon => |ic| if (c.text.atlas.symbol(ic.name, ic.size, @backingInt(ic.weight))) |sp| {
                 // Centered in its box, which may be larger (a fixed frame).
                 const inner = r.inset(st.padding);
                 const x = inner.x + (inner.w - (sp.w + 2 * sp.x)) / 2;
@@ -275,8 +276,11 @@ fn textRunLimit(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Con
         const pen = (x + g.x) * scale;
         if (pen / scale > clip4[2]) break;
         if (limit) |l| if (pen / scale >= l.end) break;
-        const px = @floor(pen);
-        const bin: u8 = @intFromFloat(@min(text_mod.subpixel_bins - 1, @floor((pen - px) * text_mod.subpixel_bins)));
+        const positions: f32 = if (native_windows) @floatFromInt(c.text.positions(g)) else text_mod.subpixel_bins;
+        const quantized = if (native_windows) @round(pen * positions) / positions else pen;
+        const px = @floor(quantized);
+        const phase = (quantized - px) * text_mod.subpixel_bins;
+        const bin: u8 = @intFromFloat(@min(text_mod.subpixel_bins - 1, if (native_windows) @round(phase) else @floor(phase)));
         const sp = c.text.glyph(g, bin) orelse continue;
         var color = base;
         if (t.spans.len > 0) {
