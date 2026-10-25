@@ -277,8 +277,8 @@ fn textRunLimit(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Con
         if (limit) |l| if (pen / scale >= l.end) break;
         const px = @floor(pen);
         const bin: u8 = @intFromFloat(@min(text_mod.subpixel_bins - 1, @floor((pen - px) * text_mod.subpixel_bins)));
-        const sp = c.text.glyph(g, bin) orelse continue;
         var color = base;
+        var tone = t.color;
         if (t.spans.len > 0) {
             const at = start + g.index;
             while (span_i < t.spans.len and t.spans[span_i].end <= at) span_i += 1;
@@ -289,8 +289,11 @@ fn textRunLimit(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Con
             }
             if (span_i < t.spans.len and t.spans[span_i].start <= at) if (t.spans[span_i].color) |sc| {
                 color = metal.color4(sc.alpha(opacity));
+                tone = sc;
             };
         }
+        // Lighter text is drawn with thicker strokes, as macOS draws it.
+        const sp = c.text.glyph(g, bin, @TypeOf(c.text.*).dilationFor(tone.r, tone.g, tone.b)) orelse continue;
         push(c, out, .{
             .rect = .{ px / scale + sp.x, baseline - g.y + sp.y, sp.w, sp.h },
             .color = color,
@@ -378,6 +381,38 @@ fn roundClip(items: []metal.Instance, box: types.Rect, visible: types.Rect, radi
     }
 }
 
+/// How long an overlay bar stays after the box last scrolled, then how
+/// long it takes to fade (GPUI's `MENU_SCROLLBAR_LINGER_MS`, `_FADE_MS`).
+const overlay_linger: f64 = 1.4;
+const overlay_fade: f64 = 0.26;
+
+fn paintOverlayBar(c: *Context, out: *std.ArrayList(metal.Instance), n: ctx_mod.Node, visible: types.Rect, opacity: f32, offset: f32, view_h: f32, content_h: f32, t: f32) void {
+    const color = n.style.scrollbar.overlay;
+    const gop = c.overlay_bars.getOrPut(c.gpa, n.id) catch return;
+    // First seen: nothing has scrolled yet.
+    if (!gop.found_existing) gop.value_ptr.* = .{ .offset = offset, .moved_at = -1e9 };
+    if (gop.value_ptr.offset != offset) gop.value_ptr.* = .{ .offset = offset, .moved_at = c.time };
+    const strip: types.Rect = .{ .x = n.rect.x + n.rect.w - 10, .y = n.rect.y, .w = 10, .h = n.rect.h };
+    const held = strip.contains(c.input.mouse);
+    const since = c.time - gop.value_ptr.moved_at;
+    const fade: f32 = if (held) 1 else @floatCast(std.math.clamp(1 - (since - overlay_linger) / overlay_fade, 0, 1));
+    if (!held and since < overlay_linger + overlay_fade) {
+        // Wake for the fade's start, then step through it.
+        c.frameIn(@floatCast(if (since < overlay_linger) overlay_linger - since else 1.0 / 60.0));
+    }
+    if (fade <= 0) return;
+    const inset: f32 = 4;
+    const track = view_h - 2 * inset;
+    const bar_h = @max(24, track * view_h / content_h);
+    const w: f32 = if (held) 5 else 3;
+    push(c, out, .{
+        .rect = .{ n.rect.x + n.rect.w - 2 - w, n.rect.y + inset + (track - bar_h) * std.math.clamp(t, 0, 1), w, bar_h },
+        .color = metal.color4(color.alpha(color.a * @as(f32, if (held) 0.68 / 0.5 else 1) * fade * opacity)),
+        .radius = w / 2,
+        .clip = metal.clip4(visible),
+    });
+}
+
 fn paintScrollbar(c: *Context, out: *std.ArrayList(metal.Instance), n: ctx_mod.Node, visible: types.Rect, opacity: f32) void {
     const offset = c.scroll.get(n.id) orelse 0;
     // The content's height: from the first child's top to the last child's bottom.
@@ -387,8 +422,9 @@ fn paintScrollbar(c: *Context, out: *std.ArrayList(metal.Instance), n: ctx_mod.N
     const content_h = last.y + last.h - first.y + n.style.padding.vertical();
     const view_h = n.rect.h;
     if (content_h <= view_h + 0.5) return;
-    const bar_h = @max(24, view_h * view_h / content_h);
     const t = offset / (content_h - view_h);
+    if (n.style.scrollbar == .overlay) return paintOverlayBar(c, out, n, visible, opacity, offset, view_h, content_h, t);
+    const bar_h = @max(24, view_h * view_h / content_h);
     const y = n.rect.y + (view_h - bar_h) * std.math.clamp(t, 0, 1);
     push(c, out, .{
         .rect = .{ n.rect.x + n.rect.w - 7, y + 2, 4, bar_h - 4 },

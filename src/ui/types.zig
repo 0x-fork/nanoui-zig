@@ -131,6 +131,16 @@ pub const Glass = struct {
     };
 };
 
+/// How a scrolling box shows its bar.
+pub const Scrollbar = union(enum) {
+    /// While the content is taller than the box.
+    always,
+    /// macOS's overlay bar, in this colour: shown while the box scrolls,
+    /// for 1.4 s after, then faded out over 0.26 s; held while the pointer
+    /// is on its 10-point strip, where it widens from 3 to 5 points.
+    overlay: Color,
+};
+
 pub const Style = struct {
     direction: Direction = .column,
     gap: f32 = 0,
@@ -156,6 +166,9 @@ pub const Style = struct {
     glass: ?Glass = null,
     /// Children are clipped to the box and scroll vertically.
     scroll: bool = false,
+    /// A scrolling box's bar: always there while there's more to see, or
+    /// an overlay that shows while it scrolls and fades away after.
+    scrollbar: Scrollbar = .always,
     /// Overall opacity of the box and its content.
     opacity: f32 = 1,
     /// Moves the box after layout, without moving its siblings.

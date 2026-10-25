@@ -166,6 +166,9 @@ pub const Context = struct {
     /// left it at (a different one was moved by the reader or the app).
     scroll_follow: std.AutoHashMapUnmanaged(u64, bool) = .empty,
     scroll_seen: std.AutoHashMapUnmanaged(u64, f32) = .empty,
+    /// An overlay bar's box: its offset as last painted, and when it last
+    /// moved (`Scrollbar.overlay`).
+    overlay_bars: std.AutoHashMapUnmanaged(u64, struct { offset: f32, moved_at: f64 }) = .empty,
     /// How far such a box may follow this frame (`capScroll`), and the
     /// boxes whose offset the reader or the app moved in the last layout.
     scroll_cap: std.AutoHashMapUnmanaged(u64, f32) = .empty,
@@ -242,6 +245,7 @@ pub const Context = struct {
         c.scroll_max.deinit(c.gpa);
         c.scroll_follow.deinit(c.gpa);
         c.scroll_seen.deinit(c.gpa);
+        c.overlay_bars.deinit(c.gpa);
         c.scroll_cap.deinit(c.gpa);
         c.scroll_moved.deinit(c.gpa);
         c.selection.deinit(c.gpa);
