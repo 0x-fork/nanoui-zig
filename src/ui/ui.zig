@@ -147,6 +147,8 @@ test {
     _ = @import("tests_raster.zig");
     _ = @import("glass.zig");
     _ = @import("tests_glass.zig");
+    _ = @import("tests_overlay_bar.zig");
+    _ = @import("tests_border.zig");
     if (@import("builtin").os.tag == .linux) _ = @import("tests_opengl.zig");
     _ = @import("tt/raster.zig");
     _ = @import("tt/tests.zig");
@@ -157,6 +159,7 @@ test {
     _ = @import("svg.zig");
     _ = @import("tests_svg.zig");
     _ = @import("tests_truncate.zig");
+    if (@import("dwrite.zig").enabled) _ = @import("tests_dwrite.zig");
     _ = @import("icons.zig");
     _ = keys;
 }
