@@ -111,6 +111,15 @@ pub const Shadow = struct {
     color: Color = .{ .a = 0.18 },
     blur: f32 = 12,
     y: f32 = 4,
+    /// Grows the shadow's box on every side before it's blurred; less than
+    /// 0 shrinks it, as CSS's spread radius does.
+    spread: f32 = 0,
+
+    /// Tailwind's `shadow-lg`, as GPUI draws it: two faint layers.
+    pub const lg = [_]Shadow{
+        .{ .color = .{ .a = 0.1 }, .blur = 15, .y = 10, .spread = -3 },
+        .{ .color = .{ .a = 0.1 }, .blur = 6, .y = 4, .spread = -4 },
+    };
 };
 
 /// The style of a box, in the manner of CSS flexbox.
@@ -162,6 +171,8 @@ pub const Style = struct {
     border_width: f32 = 1,
     radius: f32 = 0,
     shadow: ?Shadow = null,
+    /// More shadows under the box, after `shadow`: layered ones.
+    shadows: []const Shadow = &.{},
     /// Filled with Liquid Glass instead of a background.
     glass: ?Glass = null,
     /// Children are clipped to the box and scroll vertically.

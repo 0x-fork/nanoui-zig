@@ -38,3 +38,28 @@ test "a faint border round a rounded box is never lighter than over its fill" {
     };
     try testing.expect(lightest <= ceiling + 0.02);
 }
+
+test "a shadow's spread grows or shrinks its box before the blur; layers stack" {
+    const Two = struct {
+        pub fn view(_: *@This(), c: *ui.Context) void {
+            const root = ui.div(c).column().sizeFull().p(40);
+            defer root.end();
+            const box = ui.div(c).w(100).h(50).rounded(10).bg(fill).shadows(&ui.Shadow.lg);
+            box.end();
+        }
+    };
+    var s: Two = .{};
+    var t: ui.Tester = undefined;
+    try t.init(testing.allocator, .init(&s, Two.view), .{ .width = 200, .height = 160 });
+    defer t.deinit();
+    t.settle(1);
+    var shadows: usize = 0;
+    for (t.instances.items) |i| if (i.kind == @import("gpu.zig").Kind.shadow) {
+        shadows += 1;
+        // Spread -3 then -4: a box 6 or 8 points narrower, 7 (radius - 3) or
+        // 6 (radius - 4) round.
+        try testing.expect(i.rect[2] == 94 or i.rect[2] == 92);
+        try testing.expect(i.radius == 7 or i.radius == 6);
+    };
+    try testing.expectEqual(@as(usize, 2), shadows);
+}

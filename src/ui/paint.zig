@@ -85,15 +85,8 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
     const rect4: [4]f32 = .{ r.x, r.y, r.w, r.h };
 
     if (visible.w > 0 and visible.h > 0) {
-        if (st.shadow) |sh| push(c, out, .{
-            .rect = .{ r.x, r.y + sh.y, r.w, r.h },
-            .color = metal.color4(sh.color.alpha(opacity)),
-            .radius = st.radius,
-            // CSS's blur radius is twice the Gaussian's standard deviation.
-            .border_width = sh.blur / 2,
-            .kind = metal.Kind.shadow,
-            .clip = clip4,
-        });
+        if (st.shadow) |sh| paintShadow(c, out, sh, r, st.radius, opacity, clip4);
+        for (st.shadows) |sh| paintShadow(c, out, sh, r, st.radius, opacity, clip4);
         // Glass takes the background's place.
         const fill: ?types.Color = if (st.glass != null) null else st.background;
         if (st.glass) |g| push(c, out, glass.instance(glass.material(g, r.w, r.h, c.theme.dark, c.scale), rect4, st.radius, clip4, opacity));
@@ -205,6 +198,19 @@ fn paintText(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, n: ct
     } else {
         textRun(c, out, t, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel);
     }
+}
+
+fn paintShadow(c: *Context, out: *std.ArrayList(metal.Instance), sh: types.Shadow, r: types.Rect, radius: f32, opacity: f32, clip4: [4]f32) void {
+    const s = sh.spread;
+    push(c, out, .{
+        .rect = .{ r.x - s, r.y + sh.y - s, @max(0, r.w + 2 * s), @max(0, r.h + 2 * s) },
+        .color = metal.color4(sh.color.alpha(opacity)),
+        .radius = @max(0, radius + s),
+        // CSS's blur radius is twice the Gaussian's standard deviation.
+        .border_width = sh.blur / 2,
+        .kind = metal.Kind.shadow,
+        .clip = clip4,
+    });
 }
 
 /// Where a truncated line ends, and over how many points it fades out
