@@ -87,7 +87,7 @@ fn hashGlyphs(t: *ui.Tester, weight: ui.Weight, bin: u8) !u64 {
     const layout = t.text.layout("mMeEgGSs0123456789", .{ .size = 13.5, .weight = weight });
     var hash = std.hash.Wyhash.init(0);
     for (layout.glyphs) |glyph| {
-        const sp = t.text.glyph(glyph, bin) orelse return error.MissingBitmap;
+        const sp = t.text.glyph(glyph, bin, 0) orelse return error.MissingBitmap;
         const a = &t.text.atlas;
         const side: f32 = @floatFromInt(a.size);
         const x: usize = @intFromFloat(@round(sp.uv[0] * side));
@@ -117,7 +117,7 @@ test "Windows glyph cache retains phases, weights and DPI transitions" {
     const generation = t.text.atlas.generation;
     try std.testing.expectEqual(regular, try hashGlyphs(&t, .regular, 0));
     const space = t.text.layout(" ", .{ .size = 13.5 });
-    try std.testing.expect(t.text.glyph(space.glyphs[0], 0) == null);
+    try std.testing.expect(t.text.glyph(space.glyphs[0], 0, 0) == null);
     try std.testing.expectEqual(generation, t.text.atlas.generation);
 }
 
