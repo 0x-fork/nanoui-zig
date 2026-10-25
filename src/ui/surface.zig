@@ -16,7 +16,6 @@ const Context = ctx_mod.Context;
 const ui = @import("ui.zig");
 const Window = @import("../window.zig").Window;
 const pacing = @import("pacing.zig");
-
 pub const Surface = struct {
     gpa: std.mem.Allocator,
     window: *Window,
