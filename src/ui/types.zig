@@ -169,6 +169,9 @@ pub const Style = struct {
     background: ?Color = null,
     border: ?Color = null,
     border_width: f32 = 1,
+    /// Dashed: dashes twice the border's width, gaps once it, spaced evenly
+    /// round the whole box (GPUI's `border_dashed`).
+    border_dashed: bool = false,
     radius: f32 = 0,
     shadow: ?Shadow = null,
     /// More shadows under the box, after `shadow`: layered ones.

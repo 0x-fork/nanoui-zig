@@ -63,3 +63,27 @@ test "a shadow's spread grows or shrinks its box before the blur; layers stack" 
     };
     try testing.expectEqual(@as(usize, 2), shadows);
 }
+
+test "a dashed border: dashes twice its width, gaps once, round the box" {
+    const raster = @import("raster.zig");
+    // A 1-point border round a 100 by 50 box, corners 10.
+    const w: f32 = 1;
+    // Along the top: dashes and gaps alternate; most of a period is dash.
+    var on: usize = 0;
+    var off: usize = 0;
+    var x: f32 = -30;
+    while (x < 30) : (x += 0.05) {
+        if (raster.dashCover(x, -24.5, 50, 25, 10, w, 0.5) > 0.5) on += 1 else off += 1;
+    }
+    const share = @as(f32, @floatFromInt(on)) / @as(f32, @floatFromInt(on + off));
+    try std.testing.expectApproxEqAbs(@as(f32, 2.0 / 3.0), share, 0.06);
+    // Round a corner too: dashes go on through the curve.
+    var corner_on = false;
+    var a: f32 = 0;
+    while (a < 1.5) : (a += 0.01) {
+        const cx = 40 + 9.5 * @cos(-a);
+        const cy = -15 + 9.5 * @sin(-a);
+        if (raster.dashCover(cx, cy, 50, 25, 10, w, 0.5) > 0.5) corner_on = true;
+    }
+    try std.testing.expect(corner_on);
+}

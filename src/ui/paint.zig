@@ -96,6 +96,8 @@ fn paintNode(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, clip:
             .border_color = metal.color4((st.border orelse types.Color.transparent).alpha(opacity)),
             .border_width = if (st.border != null) st.border_width else 0,
             .radius = st.radius,
+            // A quad's uv is free: its x marks a dashed border.
+            .uv = .{ if (st.border_dashed) 1 else 0, 0, 0, 0 },
             .clip = clip4,
         });
         switch (n.content) {
