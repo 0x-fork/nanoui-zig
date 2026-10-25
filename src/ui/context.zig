@@ -161,6 +161,7 @@ pub const Context = struct {
     layers: std.ArrayList(u32) = .empty,
     layer_root: u32 = std.math.maxInt(u32),
     scroll: std.AutoHashMapUnmanaged(u64, f32) = .empty,
+    scrollbar_drag: ?@import("scrollbar.zig").Drag = null,
     /// The textures this frame shows (`ui.texture`), by slot.
     textures: std.ArrayList(@import("gpu.zig").Texture) = .empty,
     edits: std.AutoHashMapUnmanaged(u64, EditState) = .empty,
@@ -565,6 +566,7 @@ pub const Context = struct {
 
     pub fn pointerUp(c: *Context) void {
         c.input.down = false;
+        if (@import("scrollbar.zig").end(c)) return;
         c.input.released = true;
     }
 
@@ -577,6 +579,11 @@ pub const Context = struct {
     pub fn pointerDown(c: *Context) void {
         c.input.down = true;
         c.input.pressed = true;
+        if (@import("scrollbar.zig").begin(c)) {
+            c.input.pressed = false;
+            c.active = 0;
+            return;
+        }
         // A press outside every focusable box drops the focus.
         if (c.hot == 0) c.focus = 0;
     }
