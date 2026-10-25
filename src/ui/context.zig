@@ -99,6 +99,11 @@ pub const Interaction = struct {
     /// The second click of a double click (it is a click too): opens what
     /// a click selects, as a row's inspector.
     double_clicked: bool = false,
+    /// A secondary press (right, or Control-click on the Mac) on it or on a
+    /// box inside it: its context menu is wanted. Like an event bubbling
+    /// up, every box under the pointer sees it; ask on the one whose menu
+    /// it is.
+    secondary_clicked: bool = false,
     focused: bool,
 };
 
@@ -409,6 +414,7 @@ pub const Context = struct {
             .pressed = c.active == id and c.input.down,
             .clicked = clicked,
             .double_clicked = clicked and c.input.click_count >= 2,
+            .secondary_clicked = hovered and c.input.secondary,
             .focused = c.focus == id,
         };
     }
@@ -560,6 +566,12 @@ pub const Context = struct {
     pub fn pointerUp(c: *Context) void {
         c.input.down = false;
         c.input.released = true;
+    }
+
+    /// The secondary button went down (`Input.secondary`): no press, and
+    /// the focus stays where it was.
+    pub fn secondaryDown(c: *Context) void {
+        c.input.secondary = true;
     }
 
     pub fn pointerDown(c: *Context) void {

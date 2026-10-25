@@ -239,6 +239,14 @@ pub const Div = struct {
         return it.clicked;
     }
 
+    /// Asked for its context menu in this frame: a right-click (or a
+    /// Control-click on the Mac) on it or inside it.
+    pub fn secondaryClicked(d: Div) bool {
+        const it = d.c.interact(d.index, .{});
+        if (it.secondary_clicked) d.c.changed = true;
+        return it.secondary_clicked;
+    }
+
     pub fn hovered(d: Div) bool {
         return d.c.interact(d.index, .{}).hovered;
     }
