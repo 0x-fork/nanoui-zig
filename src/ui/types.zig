@@ -111,6 +111,15 @@ pub const Shadow = struct {
     color: Color = .{ .a = 0.18 },
     blur: f32 = 12,
     y: f32 = 4,
+    /// Grows the shadow's box on every side before it's blurred; less than
+    /// 0 shrinks it, as CSS's spread radius does.
+    spread: f32 = 0,
+
+    /// Tailwind's `shadow-lg`, as GPUI draws it: two faint layers.
+    pub const lg = [_]Shadow{
+        .{ .color = .{ .a = 0.1 }, .blur = 15, .y = 10, .spread = -3 },
+        .{ .color = .{ .a = 0.1 }, .blur = 6, .y = 4, .spread = -4 },
+    };
 };
 
 /// The style of a box, in the manner of CSS flexbox.
@@ -129,6 +138,16 @@ pub const Glass = struct {
         /// Barely frosts or tones it: glass over photos and video.
         clear,
     };
+};
+
+/// How a scrolling box shows its bar.
+pub const Scrollbar = union(enum) {
+    /// While the content is taller than the box.
+    always,
+    /// macOS's overlay bar, in this colour: shown while the box scrolls,
+    /// for 1.4 s after, then faded out over 0.26 s; held while the pointer
+    /// is on its 10-point strip, where it widens from 3 to 5 points.
+    overlay: Color,
 };
 
 pub const Style = struct {
@@ -150,12 +169,20 @@ pub const Style = struct {
     background: ?Color = null,
     border: ?Color = null,
     border_width: f32 = 1,
+    /// Dashed: dashes twice the border's width, gaps once it, spaced evenly
+    /// round the whole box (GPUI's `border_dashed`).
+    border_dashed: bool = false,
     radius: f32 = 0,
     shadow: ?Shadow = null,
+    /// More shadows under the box, after `shadow`: layered ones.
+    shadows: []const Shadow = &.{},
     /// Filled with Liquid Glass instead of a background.
     glass: ?Glass = null,
     /// Children are clipped to the box and scroll vertically.
     scroll: bool = false,
+    /// A scrolling box's bar: always there while there's more to see, or
+    /// an overlay that shows while it scrolls and fades away after.
+    scrollbar: Scrollbar = .always,
     /// Overall opacity of the box and its content.
     opacity: f32 = 1,
     /// Moves the box after layout, without moving its siblings.

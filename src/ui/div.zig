@@ -152,6 +152,14 @@ pub const Div = struct {
     pub fn shadow(d: Div, s: types.Shadow) Div {
         return d.set("shadow", @as(?types.Shadow, s));
     }
+    /// The border in dashes, as GPUI's `border_dashed`.
+    pub fn dashed(d: Div) Div {
+        return d.set("border_dashed", true);
+    }
+    /// Layered shadows, after `shadow`: `.shadows(&ui.Shadow.lg)`.
+    pub fn shadows(d: Div, list: []const types.Shadow) Div {
+        return d.set("shadows", list);
+    }
     pub fn shadowSm(d: Div) Div {
         return d.shadow(.{ .color = d.c.theme.shadow.alpha(0.6), .blur = 3, .y = 1 });
     }
