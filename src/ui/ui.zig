@@ -158,6 +158,7 @@ test {
     _ = @import("svg.zig");
     _ = @import("tests_svg.zig");
     _ = @import("tests_truncate.zig");
+    if (@import("dwrite.zig").enabled) _ = @import("tests_dwrite.zig");
     _ = @import("icons.zig");
     _ = keys;
 }
