@@ -174,6 +174,10 @@ pub const Input = struct {
     released: bool = false,
     /// Which button the last press was.
     button: Button = .left,
+    /// The secondary button went down in this event: the right one, or a
+    /// Control-click on the Mac. It isn't a press (`pressed` stays false):
+    /// it asks for a box's context menu (`Div.secondaryClicked`).
+    secondary: bool = false,
     click_count: u32 = 0,
     scroll: types.Point = .{},
     scroll_phase: ScrollPhase = .none,
@@ -214,6 +218,7 @@ pub const Input = struct {
     pub fn clearEdges(i: *Input) void {
         i.pressed = false;
         i.released = false;
+        i.secondary = false;
         i.scroll = .{};
         i.scroll_phase = .none;
         i.mods_changed = false;

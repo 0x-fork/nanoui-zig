@@ -328,6 +328,13 @@ fn onPress(w: *gtk.Widget, e: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int 
     g.gtk_widget_grab_focus(w);
     var button: c_uint = 0;
     _ = gtk.v3.gdk_event_get_button(e, &button);
+    if (button == 3) {
+        s.setMouse(e);
+        s.ctx.updateHot();
+        s.ctx.secondaryDown();
+        s.frame();
+        return 1;
+    }
     if (button != 1) return 0;
     s.setMouse(e);
     var count: c_uint = 1;

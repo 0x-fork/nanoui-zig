@@ -10,7 +10,7 @@ const Row = struct {
     turned: bool = false,
     fn view(r: *Row, c: *ui.Context) void {
         ui.row(c, .{ .width = .{ .px = 140 } });
-        ui.text(c, path, .{ .size = 13, .truncate_middle = true });
+        ui.text(c, path, .{ .size = 13, .truncate = .middle });
         ui.end(c);
         ui.row(c, .{});
         ui.icon(c, "chevron.right", .{ .size = 13, .frame = 20, .rotation = if (r.turned) std.math.pi / 2.0 else 0 });
