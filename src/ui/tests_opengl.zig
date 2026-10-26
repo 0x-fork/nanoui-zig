@@ -91,8 +91,18 @@ fn compare(t: *ui.Tester, limits: Limits, es: bool) !void {
         if (d > 8) off += 1;
     }
     const mean = @as(f64, @floatFromInt(total)) / @as(f64, @floatFromInt(cpu.bytes.len));
-    if (mean >= limits.mean or worst > limits.worst or off * limits.off_in >= cpu.bytes.len)
+    if (mean >= limits.mean or worst > limits.worst or off * limits.off_in >= cpu.bytes.len) {
         std.debug.print("OpenGL{s} vs CPU: mean {d:.4}, worst {d}, {d} of {d} channels off\n", .{ if (es) " ES" else "", mean, worst, off, cpu.bytes.len });
+        var shown: usize = 0;
+        for (ours.bytes, cpu.bytes, 0..) |a, b, i| {
+            const d = if (a > b) a - b else b - a;
+            if (d <= 8) continue;
+            const pixel = i / 4;
+            std.debug.print("  at {d},{d} channel {d}: GL {d} CPU {d}\n", .{ pixel % cpu.width, pixel / cpu.width, i % 4, a, b });
+            shown += 1;
+            if (shown == 12) break;
+        }
+    }
     try testing.expect(mean < limits.mean);
     try testing.expect(worst <= limits.worst);
     // Edges may round differently; few channels more than 8 levels apart.
