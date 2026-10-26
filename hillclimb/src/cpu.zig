@@ -14,7 +14,7 @@ pub fn run(gpa: std.mem.Allocator, scene: scenes.Scene, frames: usize) !main.Res
     try t.init(gpa, .init(&state, scenes.State.view), .{ .width = main.width, .height = main.height, .scale = main.scale });
     defer t.deinit();
     t.dt = 1.0 / 120.0;
-    var cv: ui.Canvas = .{};
+    var cv: ui.PixelCanvas = .{};
     defer cv.deinit(gpa);
 
     const frame_ms = try gpa.alloc(f64, frames);

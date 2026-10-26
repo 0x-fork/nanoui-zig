@@ -103,7 +103,7 @@ pub const ListRows = @import("list.zig").Rows;
 pub const Tester = @import("tester.zig").Tester;
 pub const TesterOptions = @import("tester.zig").Options;
 /// Offscreen pixels a CPU window reuses (`canvas.zig`).
-pub const Canvas = @import("canvas.zig").Canvas;
+pub const PixelCanvas = @import("canvas.zig").Canvas;
 /// CPU raster (Linux/Windows). `raster.shadow_samples` is 4 to match Metal.
 pub const raster = @import("raster.zig");
 

@@ -218,7 +218,7 @@ fn roundedBox(px: f32, py: f32, hw: f32, hh: f32, r: f32) [2]f32 {
 /// How much of the pixel at `wx`, `wy` the instance's clip lets through:
 /// all of it, but in the clip's rounded corners (as the shader's
 /// `clip_cover`).
-pub inline fn clipCover(i: *const gpu.Instance, wx: f32, wy: f32, inv: f32) f32 {
+pub fn clipCover(i: *const gpu.Instance, wx: f32, wy: f32, inv: f32) f32 {
     if (i.clip_round <= 0) return 1;
     const round = gpu.clipCorners(i.clip_round);
     const c = i.clip;
