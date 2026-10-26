@@ -82,7 +82,12 @@ test "a quarter turn sets xf rotation on the same centre" {
 
 /// The one symbol's quad: the text-kind instance in the icon's row.
 fn glyph(t: *ui.Tester) ?@TypeOf(t.instances.items[0]) {
-    for (t.instances.items) |i| if (i.kind == @import("gpu.zig").Kind.text and i.rect[1] < 60 and i.rect[1] > 10) return i;
+    var i = t.instances.items.len;
+    while (i > 0) {
+        i -= 1;
+        const inst = t.instances.items[i];
+        if (inst.kind == @import("gpu.zig").Kind.text and inst.rect[1] < 60 and inst.rect[1] > 10) return inst;
+    }
     return null;
 }
 

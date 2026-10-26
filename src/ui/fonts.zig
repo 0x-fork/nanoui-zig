@@ -3,6 +3,7 @@
 //! that is not installed falls back to the system's; a family without
 //! italics is slanted, as browsers synthesize them.
 const std = @import("std");
+const builtin = @import("builtin");
 const objc = @import("../objc.zig");
 const cf = @import("cf.zig");
 const types = @import("types.zig");
@@ -130,6 +131,7 @@ pub fn tabular(base: cf.CTFontRef) cf.CTFontRef {
 }
 
 extern "c" const NSFontDescriptorSystemDesignRounded: objc.Object;
+extern "c" const UIFontDescriptorSystemDesignRounded: objc.Object;
 
 /// `base` in the system's rounded design (SF Rounded), released; `base`
 /// itself where the face has none (a named family).
@@ -138,9 +140,10 @@ pub fn rounded(base: cf.CTFontRef) cf.CTFontRef {
     defer pool.pop();
     const font: objc.Object = @ptrCast(base);
     const desc = objc.msg(objc.Object, font, "fontDescriptor", .{});
-    const round = objc.msg(?objc.Object, desc, "fontDescriptorWithDesign:", .{NSFontDescriptorSystemDesignRounded}) orelse return base;
+    const design = if (builtin.os.tag == .ios) UIFontDescriptorSystemDesignRounded else NSFontDescriptorSystemDesignRounded;
+    const round = objc.msg(?objc.Object, desc, "fontDescriptorWithDesign:", .{design}) orelse return base;
     // Size 0: the descriptor's own.
-    const made = objc.msg(?objc.Object, objc.class("NSFont"), "fontWithDescriptor:size:", .{ round, @as(f64, 0) }) orelse return base;
+    const made = objc.msg(?objc.Object, objc.class(objc.font_class), "fontWithDescriptor:size:", .{ round, @as(f64, 0) }) orelse return base;
     cf.CFRelease(base);
     return @ptrCast(objc.retain(made));
 }

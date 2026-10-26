@@ -12,7 +12,11 @@ layout(location = 2) in vec4 a_border_color;
 layout(location = 3) in vec4 a_uv;     // atlas u0, v0, u1, v1
 layout(location = 4) in vec4 a_clip;   // x0, y0, x1, y1
 layout(location = 5) in vec4 a_misc;   // radius, border width, kind, clip_round
+layout(location = 6) in vec4 a_xf;     // angle, spin, pivot x, pivot y
+layout(location = 7) in vec4 a_pulse;  // period, scale amplitude, alpha low
+layout(location = 8) in vec4 a_vel;    // motion blur vector in points
 uniform vec2 viewport;
+uniform float time;
 out vec2 v_local;
 out vec2 v_world;
 out vec2 v_uv;
@@ -22,12 +26,25 @@ flat out vec4 i_border_color;
 flat out vec4 i_uv;
 flat out vec4 i_clip;
 flat out vec4 i_misc;
+out vec2 v_vel;
+out float v_pulse_alpha;
 
 void main() {
     vec2 corner = vec2(float(gl_VertexID & 1), float(gl_VertexID >> 1));
     // Shadows reach three standard deviations past their box.
     float grow = (a_misc.z == 2.0 || a_misc.z == 5.0) ? a_misc.y * 3.0 : 0.0;
-    vec2 p = a_rect.xy - grow + corner * (a_rect.zw + 2.0 * grow);
+    vec2 velocity = a_vel.xy;
+    float vlen = length(velocity);
+    if (vlen > 24.0) {
+        velocity *= 24.0 / vlen;
+        vlen = 24.0;
+    }
+    bool has_blur = vlen > 0.5 && (a_misc.z == 0.0 || a_misc.z == 1.0 || a_misc.z == 3.0);
+    vec2 grow2 = vec2(grow) + (has_blur ? abs(velocity) * 0.5 : vec2(0.0));
+    vec2 p_unrot = a_rect.xy - grow2 + corner * (a_rect.zw + 2.0 * grow2);
+    vec2 p = p_unrot;
+    float pulse_alpha = 1.0;
+    float angle = a_xf.x + a_xf.y * time;
     if (a_misc.z == 6.0) {
         // A box along the line, a point past its round ends.
         vec2 a = a_uv.xy, b = a_uv.zw;
@@ -39,11 +56,26 @@ void main() {
     } else if (a_misc.z == 7.0) {
         // The triangle itself: its third corner twice.
         p = gl_VertexID == 0 ? a_uv.xy : (gl_VertexID == 1 ? a_uv.zw : a_border_color.xy);
+    } else if (angle != 0.0 || a_pulse.x > 0.0) {
+        vec2 d = p - a_xf.zw;
+        if (a_pulse.x > 0.0) {
+            float s = 0.5 - 0.5 * cos(6.28318530718 * time / a_pulse.x);
+            float k = 1.0 + a_pulse.y * (2.0 * s - 1.0);
+            d *= k;
+            pulse_alpha = mix(a_pulse.z, 1.0, s);
+        }
+        if (angle != 0.0) {
+            float ca = cos(angle), sa = sin(angle);
+            d = vec2(ca * d.x - sa * d.y, sa * d.x + ca * d.y);
+        }
+        p = a_xf.zw + d;
     }
     gl_Position = vec4(p / viewport * vec2(2.0, -2.0) + vec2(-1.0, 1.0), 0.0, 1.0);
-    v_local = p - a_rect.xy;
+    v_local = p_unrot - a_rect.xy;
     v_world = p;
-    v_uv = mix(a_uv.xy, a_uv.zw, corner);
+    v_uv = has_blur ? a_uv.xy + (p_unrot - a_rect.xy) / max(a_rect.zw, vec2(1e-4)) * (a_uv.zw - a_uv.xy) : mix(a_uv.xy, a_uv.zw, corner);
+    v_vel = has_blur ? velocity : vec2(0.0);
+    v_pulse_alpha = pulse_alpha;
     i_rect = a_rect;
     i_color = a_color;
     i_border_color = a_border_color;
@@ -63,6 +95,8 @@ flat in vec4 i_border_color;
 flat in vec4 i_uv;
 flat in vec4 i_clip;
 flat in vec4 i_misc;
+in vec2 v_vel;
+in float v_pulse_alpha;
 out vec4 frag;
 // The frame's pixels a point.
 uniform float scale;
@@ -109,6 +143,21 @@ float rounded_box(vec2 p, vec2 half_size, float r) {
 // Metal takes from fwidth, exactly, as raster.zig computes it. GPUs whose
 // derivatives are coarse (dFdx from one row of a 2×2 block, dFdy from one
 // column) would make it twice that at a box's corners.
+float shadow_dither(vec2 pos) {
+    uint x = uint(pos.x), y = uint(pos.y);
+    uint h1 = (x * 1664525u + y * 1013904223u) ^ 0x68bc21ebu;
+    h1 ^= h1 >> 15;
+    h1 *= 0x85ebca6bu;
+    h1 ^= h1 >> 13;
+    uint h2 = (x * 22695477u + y * 2891336453u) ^ 0x02e5be93u;
+    h2 ^= h2 >> 15;
+    h2 *= 0xc2b2ae35u;
+    h2 ^= h2 >> 13;
+    float u1 = float(h1 & 0xffffu) / 65535.0;
+    float u2 = float(h2 & 0xffffu) / 65535.0;
+    return (u1 + u2 - 1.0) * (0.5 / 255.0);
+}
+
 vec2 rounded_box_aa(vec2 p, vec2 half_size, float r) {
     vec2 q = abs(p) - half_size + r;
     vec2 m = max(q, 0.0);
@@ -229,7 +278,17 @@ vec4 shade() {
     if (kind == 6.0) return line_color();
     if (kind == 7.0) return triangle_color();
     if (kind == 1.0) {
-        float a = texture(atlas, v_uv).r * i_color.a;
+        float a = 0.0;
+        if (length(v_vel) > 0.5) {
+            vec2 duv = v_vel / max(i_rect.zw, vec2(1e-4)) * (i_uv.zw - i_uv.xy);
+            for (int k = 0; k < 5; k++) {
+                vec2 uvk = v_uv - duv * (float(k) * 0.25 - 0.5);
+                if (all(greaterThanEqual(uvk, i_uv.xy)) && all(lessThanEqual(uvk, i_uv.zw))) a += texture(atlas, uvk).r;
+            }
+            a *= 0.2 * i_color.a;
+        } else {
+            a = texture(atlas, v_uv).r * i_color.a;
+        }
         // A truncated line fading out: `border_width` points before `radius`.
         if (i_misc.y > 0.0) a *= clamp((i_misc.x - v_world.x) / i_misc.y, 0.0, 1.0);
         return vec4(i_color.rgb * a, a);
@@ -240,7 +299,16 @@ vec4 shade() {
     vec2 da = rounded_box_aa(p, half_size, r);
     float d = da.x;
     float aa = da.y;
-    float coverage = 1.0 - smoothstep(-aa, aa, d);
+    float coverage = 0.0;
+    if (length(v_vel) > 0.5) {
+        for (int k = 0; k < 5; k++) {
+            float dk = rounded_box(p - v_vel * (float(k) * 0.25 - 0.5), half_size, r);
+            coverage += 1.0 - smoothstep(-aa, aa, dk);
+        }
+        coverage *= 0.2;
+    } else {
+        coverage = 1.0 - smoothstep(-aa, aa, d);
+    }
     if (kind == 3.0) {
         // Premultiplied already: scaled by the corners' coverage and opacity.
         vec4 px = texture(images, v_uv);
@@ -259,6 +327,7 @@ vec4 shade() {
         float sigma = max(i_misc.y, 0.25);
         float a = shadow_alpha(p, half_size, r, sigma) * i_color.a;
         if (kind == 5.0) a *= clamp(rounded_box(p - i_uv.xy, half_size, r) + 0.5, 0.0, 1.0);
+        if (a > 0.0) a = clamp(a + shadow_dither(gl_FragCoord.xy), 0.0, 1.0);
         return vec4(i_color.rgb * a, a);
     }
     // Premultiplied: the border is laid over the fill (see shader.metal).
@@ -275,7 +344,7 @@ vec4 shade() {
 
 void main() {
     float clip_cover = clip_coverage();
-    frag = shade() * clip_cover;
+    frag = shade() * (clip_cover * v_pulse_alpha);
 }
 #endif
 
