@@ -193,7 +193,7 @@ uniform sampler2D images;
 
 // Shadows as GPUI draws them (after Evan Wallace's "fast rounded rectangle
 // shadows"): the box's coverage blurred by a Gaussian, exact along x with
-// erf, sampled four times along y.
+// erf, sampled eight times along y.
 float gaussian(float x, float sigma) {
     return exp(-(x * x) / (2.0 * sigma * sigma)) / (sqrt(2.0 * 3.14159265358979) * sigma);
 }
@@ -213,15 +213,16 @@ float blur_along_x(float x, float y, float sigma, float corner, vec2 half_size) 
 }
 
 float shadow_alpha(vec2 p, vec2 half_size, float corner, float sigma) {
+    float c = abs(corner);
     float low = p.y - half_size.y;
     float high = p.y + half_size.y;
     float start = clamp(-3.0 * sigma, low, high);
     float end = clamp(3.0 * sigma, low, high);
-    float step = (end - start) / 4.0;
+    float step = (end - start) / 8.0;
     float y = start + step * 0.5;
     float alpha = 0.0;
-    for (int k = 0; k < 4; k++) {
-        alpha += blur_along_x(p.x, p.y - y, sigma, corner, half_size) * gaussian(y, sigma) * step;
+    for (int k = 0; k < 8; k++) {
+        alpha += blur_along_x(p.x, p.y - y, sigma, c, half_size) * gaussian(y, sigma) * step;
         y += step;
     }
     return alpha;
