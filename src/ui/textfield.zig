@@ -23,15 +23,14 @@ pub const TextBuffer = struct {
     /// The box id this buffer was last built under, so focus, caret and undo
     /// survive when a parent container is added or removed around the field.
     last_id: u64 = 0,
+    /// Asked to take the keyboard (`focus`): its field does, next frame.
+    want_focus: bool = false,
     const gpa = std.heap.c_allocator;
 
     pub fn deinit(b: *TextBuffer) void {
         b.buf.deinit(gpa);
         b.* = .{};
     }
-
-    /// Asked to take the keyboard (`focus`): its field does, next frame.
-    want_focus: bool = false,
 
     /// Gives its field the keyboard, as clicking into it would: ⌘L to the
     /// composer, a new tab's prompt.

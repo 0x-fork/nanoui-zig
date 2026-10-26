@@ -289,8 +289,6 @@ pub const TextStyle = struct {
     /// ellipsis, faded toward its end, or shortened through its middle.
     truncate: Truncate = .none,
     fade_width: f32 = 24,
-    /// Monospaced spans' size over the surrounding text's.
-    mono_scale: f32 = 0.9,
     /// Wrapped text keeps at most this many lines (0: all of them), the
     /// last ending in "…" when text was dropped.
     max_lines: u8 = 0,
