@@ -93,6 +93,11 @@ fn compare(t: *ui.Tester, limits: Limits, es: bool) !void {
     const mean = @as(f64, @floatFromInt(total)) / @as(f64, @floatFromInt(cpu.bytes.len));
     if (mean >= limits.mean or worst > limits.worst or off * limits.off_in >= cpu.bytes.len) {
         std.debug.print("OpenGL{s} vs CPU: mean {d:.4}, worst {d}, {d} of {d} channels off\n", .{ if (es) " ES" else "", mean, worst, off, cpu.bytes.len });
+        for (t.instances.items) |inst| {
+            const p = [2]f32{ 20, 73.5 };
+            if (inst.rect[0] <= p[0] and inst.rect[1] <= p[1] and inst.rect[0] + inst.rect[2] >= p[0] and inst.rect[1] + inst.rect[3] >= p[1])
+                std.debug.print("  instance: {any}\n", .{inst});
+        }
         var shown: usize = 0;
         for (ours.bytes, cpu.bytes, 0..) |a, b, i| {
             const d = if (a > b) a - b else b - a;
