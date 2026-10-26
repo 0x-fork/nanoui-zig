@@ -131,6 +131,23 @@ test "the OpenGL ES renderer draws what the CPU renderer draws" {
 /// The scenes, drawn by both renderers.
 fn scenes(es: bool) !void {
     const gpa = testing.allocator;
+    const Probe = struct {
+        shadow: bool,
+        fn view(s: *@This(), c: *ui.Context) void {
+            const card = ui.div(c).w(296).h(134).rounded(12).bg(.white);
+            if (s.shadow) card.style().shadow = .{ .blur = 18, .y = 6 };
+            card.end();
+        }
+    };
+    for ([_]bool{ false, true }) |shadow| {
+        var p: Probe = .{ .shadow = shadow };
+        var t: ui.Tester = undefined;
+        try t.init(gpa, .init(&p, Probe.view), .{ .width = 360, .height = 300 });
+        defer t.deinit();
+        t.settle(1);
+        std.debug.print("card probe, shadow={}\n", .{shadow});
+        try compare(&t, .{ .mean = 100, .worst = 255, .off_in = 1 }, es);
+    }
     // A gradient picture, half transparent at one end.
     var px: [48 * 32 * 4]u8 = undefined;
     for (0..32) |y| for (0..48) |x| {
