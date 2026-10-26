@@ -138,6 +138,13 @@ pub const Tester = struct {
         t.frame();
     }
 
+    /// A right-click at (x, y): a box's context menu.
+    pub fn secondaryClick(t: *Tester, x: f32, y: f32) void {
+        t.moveTo(x, y);
+        t.ctx.secondaryDown();
+        t.frame();
+    }
+
     pub fn drag(t: *Tester, x1: f32, y1: f32, x2: f32, y2: f32) void {
         t.moveTo(x1, y1);
         t.ctx.pointerDown();
@@ -189,11 +196,21 @@ pub const Tester = struct {
         t.ctx.updateHot();
     }
 
+    /// Pinches about (x, y): spread by `factor`, the fingers moved together
+    /// by (dx, dy), as two fingers on a touch screen do.
+    pub fn pinch(t: *Tester, x: f32, y: f32, factor: f32, dx: f32, dy: f32) void {
+        t.ctx.input.mouse = .{ .x = x, .y = y };
+        t.ctx.input.zoom = factor;
+        t.ctx.input.pan = .{ .x = dx, .y = dy };
+        t.frame();
+        t.ctx.updateHot();
+    }
+
     /// The rectangle of the text `s` in the last frame.
     pub fn findText(t: *Tester, s: []const u8) ?types.Rect {
         for (t.ctx.nodes.items) |n| switch (n.content) {
             .text => |tx| if (std.mem.eql(u8, tx.str, s)) return n.rect,
-            .icon, .image, .texture, .none => {},
+            .icon, .image, .texture, .canvas, .none => {},
         };
         return null;
     }
@@ -206,7 +223,7 @@ pub const Tester = struct {
     pub fn containsText(t: *Tester, s: []const u8) bool {
         for (t.ctx.nodes.items) |n| switch (n.content) {
             .text => |tx| if (std.mem.indexOf(u8, tx.str, s) != null) return true,
-            .icon, .image, .texture, .none => {},
+            .icon, .image, .texture, .canvas, .none => {},
         };
         return false;
     }

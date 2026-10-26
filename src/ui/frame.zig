@@ -28,6 +28,7 @@ pub fn run(c: *Context, view: View, ts: *text.TextSystem, instances: *std.ArrayL
     c.frame_in = null;
     ts.setFamilies(theme.font, theme.mono_font);
     ts.beginFrame();
+    @import("scrollbar.zig").update(c);
 
     const t0 = now();
     if (c.input.pressed) c.selection.pressed = true;
