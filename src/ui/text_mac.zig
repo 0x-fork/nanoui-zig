@@ -207,7 +207,8 @@ pub const TextSystem = struct {
         var h = std.hash.Wyhash.init(extra);
         h.update(s);
         h.update(std.mem.asBytes(&style.size));
-        h.update(&.{ @intFromEnum(style.weight), @intFromBool(style.mono), @intFromBool(style.italic), @intFromBool(style.tabular), @intFromBool(style.rounded) });
+        h.update(std.mem.asBytes(&style.mono_scale));
+        h.update(&.{ @backingInt(style.weight), @intFromBool(style.mono), @intFromBool(style.italic), @intFromBool(style.tabular), @intFromBool(style.rounded) });
         h.update(std.mem.asBytes(&style.tracking));
         return h.final();
     }

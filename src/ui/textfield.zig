@@ -30,6 +30,15 @@ pub const TextBuffer = struct {
         b.* = .{};
     }
 
+    /// Asked to take the keyboard (`focus`): its field does, next frame.
+    want_focus: bool = false,
+
+    /// Gives its field the keyboard, as clicking into it would: ⌘L to the
+    /// composer, a new tab's prompt.
+    pub fn focus(b: *TextBuffer) void {
+        b.want_focus = true;
+    }
+
     pub fn text(b: *const TextBuffer) []const u8 {
         return b.buf.items;
     }
@@ -280,8 +289,14 @@ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
     }, null);
     defer c.end();
     rehome(c, buffer, c.node(i).id);
-    const it = c.interact(i, .{ .focusable = true });
+    var it = c.interact(i, .{ .focusable = true });
     c.addA11y(i, .text_field, opts.placeholder, buffer.text(), it.focused, true);
+    if (buffer.want_focus) {
+        buffer.want_focus = false;
+        c.focus = it.id;
+        it.focused = true;
+        c.changed = true;
+    }
     if (it.hovered) {
         c.cursor_hand = false;
         c.cursor_text = true;
