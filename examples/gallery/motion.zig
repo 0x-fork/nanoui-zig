@@ -42,14 +42,16 @@ pub const Demo = struct {
     }
 
     fn content(d: *Demo, c: *ui.Context) void {
-        const sc = ui.div(c).column().sizeFull().scrollY().p(28).gap(20);
+        const sc = ui.div(c).column().sizeFull().scrollY().p(if (@import("phone.zig").compact(c)) 16 else 28).gap(20);
         defer sc.end();
         const bar = motion.scroll.value(c, "read", sc.id(), .{ 8, @max(24, c.size.w - 56) }, .instant);
         _ = c.leaf(.{ .width = .{ .px = bar }, .height = .{ .px = 3 }, .radius = 2, .background = c.theme.accent }, .none, null);
         ui.heading(c, "Motion");
-        ui.label(c, "Springs and tweens, interruptible: click twice quickly and watch it turn.");
+        ui.text(c, "Springs and tweens, interruptible: click twice quickly and watch it turn.", .{ .wrap = true, .color = c.theme.muted });
         {
-            const r = ui.div(c).row().wFull().gap(16).itemsStart();
+            // Side by side, or stacked on a phone.
+            const wide = !@import("phone.zig").compact(c);
+            const r = (if (wide) ui.div(c).row() else ui.div(c).column()).wFull().gap(16).itemsStart();
             defer r.end();
             d.card(c);
             d.counter(c);

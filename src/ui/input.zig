@@ -25,6 +25,34 @@ pub const Shortcut = struct {
     pub const tab: u21 = '\t';
     pub const enter: u21 = '\r';
 
+    /// A combination as scripts write it: `cmd+shift+n`, `cmd+enter`,
+    /// `escape`, `ctrl+tab`, `cmd+1`, `alt+up`.
+    pub fn parse(text: []const u8) ?Shortcut {
+        var s: Shortcut = .{ .key = 0 };
+        var parts = std.mem.splitScalar(u8, text, '+');
+        while (parts.next()) |p| {
+            const eq = std.ascii.eqlIgnoreCase;
+            if (eq(p, "cmd")) s.cmd = true else if (eq(p, "ctrl")) s.ctrl = true else if (eq(p, "alt") or eq(p, "opt")) s.alt = true else if (eq(p, "shift")) s.shift = true else {
+                const named = [_]struct { []const u8, u21 }{
+                    .{ "enter", enter }, .{ "return", enter }, .{ "escape", escape }, .{ "esc", escape },
+                    .{ "tab", tab },     .{ "up", up },        .{ "down", down },     .{ "left", left },
+                    .{ "right", right }, .{ "space", ' ' },    .{ "backspace", 0x7f }, .{ "delete", 0x7f },
+                    .{ "plus", '+' },
+                };
+                s.key = for (named) |n| {
+                    if (eq(p, n[0])) break n[1];
+                } else blk: {
+                    // One character, whole.
+                    const len = std.unicode.utf8ByteSequenceLength(if (p.len > 0) p[0] else return null) catch return null;
+                    if (len != p.len) return null;
+                    break :blk std.unicode.utf8Decode(p) catch return null;
+                };
+                if (s.key < 128) s.key = std.ascii.toLower(@intCast(s.key));
+            }
+        }
+        return if (s.key == 0) null else s;
+    }
+
     /// As this platform has it: Command is Control off Apple's systems.
     pub fn native(s: Shortcut) Shortcut {
         if (@import("keys.zig").mac or !s.cmd) return s;
@@ -149,8 +177,17 @@ pub const Input = struct {
     /// The button went down / up in this event.
     pressed: bool = false,
     released: bool = false,
+    /// The secondary button went down in this event: the right one, or a
+    /// Control-click on the Mac. It isn't a press (`pressed` stays false):
+    /// it asks for a box's context menu (`Div.secondaryClicked`).
+    secondary: bool = false,
     click_count: u32 = 0,
     scroll: types.Point = .{},
+    /// A pinch in this event (two fingers on a touch screen, a trackpad's
+    /// magnify): how much it scaled by (1: none), about `mouse`.
+    zoom: f32 = 1,
+    /// How far two fingers moved together in this event.
+    pan: types.Point = .{},
     key: ?Key = null,
     /// Text typed or pasted in this event.
     chars: []const u8 = "",
@@ -173,7 +210,10 @@ pub const Input = struct {
     pub fn clearEdges(i: *Input) void {
         i.pressed = false;
         i.released = false;
+        i.secondary = false;
         i.scroll = .{};
+        i.zoom = 1;
+        i.pan = .{};
         i.key = null;
         i.chars = "";
         i.ops = &.{};
