@@ -135,7 +135,7 @@ fn scenes(es: bool) !void {
         shadow: bool,
         fn view(s: *@This(), c: *ui.Context) void {
             const card = ui.div(c).w(296).h(134).rounded(12).bg(.white);
-            if (s.shadow) card.style().shadow = .{ .blur = 18, .y = 6 };
+            if (s.shadow) c.node(card.index).style.shadow = .{ .blur = 18, .y = 6 };
             card.end();
         }
     };
