@@ -167,6 +167,42 @@ vec2 rounded_box_aa(vec2 p, vec2 half_size, float r) {
     return vec2(d, max(grad / scale, 0.0001) * 0.5);
 }
 
+vec2 corner_sdf_aa(vec2 p, vec2 half_size, float r_in) {
+    float r = min(abs(r_in), min(half_size.x, half_size.y));
+    if (r <= 0.0 || r_in < 0.0) return rounded_box_aa(p, half_size, r);
+    float dx = half_size.x - abs(p.x);
+    float dy = half_size.y - abs(p.y);
+    float a = min(dx, dy);
+    float b_val = max(dx, dy);
+    float half_long = (dy >= dx) ? half_size.y : half_size.x;
+    float ext = min(1.52866495 * r, half_long);
+    float d, grad;
+    if (b_val >= ext) {
+        d = -a;
+        grad = 1.0;
+    } else if (b_val >= 0.63149399 * r && a > -0.25 * r) {
+        float span = max(ext - 0.63149399 * r, 1e-5);
+        float u = clamp((ext - b_val) / span, 0.0, 1.0);
+        float uu = u * u;
+        float uuu = uu * u;
+        const float c3 = 0.00759166, c4 = 0.06728002, c5 = 0.00003973;
+        float indent = r * (c3 * uuu + c4 * uuu * u + c5 * uuu * uu);
+        float slope = r * (3.0 * c3 * uu + 4.0 * c4 * uuu + 5.0 * c5 * uu * uu) / span;
+        float inv_norm = 1.0 / sqrt(1.0 + slope * slope);
+        d = (indent - a) * inv_norm;
+        grad = (1.0 + slope) * inv_norm;
+    } else {
+        float cx = 0.950248 * r;
+        float cr = 0.931599 * r;
+        vec2 q = vec2(cx - dx, cx - dy);
+        vec2 m = max(q, 0.0);
+        float len = length(m);
+        d = len + min(max(q.x, q.y), 0.0) - cr;
+        grad = len > 0.0 ? (m.x + m.y) / len : 1.0;
+    }
+    return vec2(d, max(grad / scale, 0.0001) * 0.5);
+}
+
 // How much of the fragment the instance's clip lets through: discarded
 // outside it, cut in its rounded corners.
 float clip_coverage() {
@@ -178,7 +214,7 @@ float clip_coverage() {
         float rad = clip_round - corners * 4096.0;
         vec2 ch = (i_clip.zw - i_clip.xy) * 0.5;
         vec2 q = v_world - i_clip.xy - ch;
-        vec2 cd = rounded_box_aa(q, ch, min(rad, min(ch.x, ch.y)));
+        vec2 cd = corner_sdf_aa(q, ch, min(rad, min(ch.x, ch.y)));
         uint bit = q.y < 0.0 ? (q.x < 0.0 ? 1u : 2u) : (q.x < 0.0 ? 8u : 4u);
         if ((uint(corners) & bit) != 0u) clip_cover = 1.0 - smoothstep(-cd.y, cd.y, cd.x);
         if (clip_cover <= 0.0) discard;
@@ -296,14 +332,15 @@ vec4 shade() {
     }
     vec2 half_size = i_rect.zw * 0.5;
     vec2 p = v_local - half_size;
-    float r = min(i_misc.x, min(half_size.x, half_size.y));
-    vec2 da = rounded_box_aa(p, half_size, r);
+    float r_abs = min(abs(i_misc.x), min(half_size.x, half_size.y));
+    float r = i_misc.x < 0.0 ? -r_abs : r_abs;
+    vec2 da = corner_sdf_aa(p, half_size, r);
     float d = da.x;
     float aa = da.y;
     float coverage = 0.0;
     if (length(v_vel) > 0.5) {
         for (int k = 0; k < 5; k++) {
-            float dk = rounded_box(p - v_vel * (float(k) * 0.25 - 0.5), half_size, r);
+            float dk = corner_sdf_aa(p - v_vel * (float(k) * 0.25 - 0.5), half_size, r).x;
             coverage += 1.0 - smoothstep(-aa, aa, dk);
         }
         coverage *= 0.2;
@@ -327,8 +364,8 @@ vec4 shade() {
     if (kind == 2.0 || kind == 5.0) {
         float sigma = max(i_misc.y, 0.25);
         float a = shadow_alpha(p, half_size, r, sigma) * i_color.a;
-        if (kind == 5.0) a *= clamp(rounded_box(p - i_uv.xy, half_size, r) + 0.5, 0.0, 1.0);
-        if (a > 0.0) a = clamp(a + shadow_dither(gl_FragCoord.xy), 0.0, 1.0);
+        if (kind == 5.0) a *= clamp(corner_sdf_aa(p - i_uv.xy, half_size, r).x + 0.5, 0.0, 1.0);
+        if (a > 0.0) a = clamp(a + shadow_dither(v_world * scale), 0.0, 1.0);
         return vec4(i_color.rgb * a, a);
     }
     // Premultiplied: the border is laid over the fill (see shader.metal).
@@ -337,7 +374,7 @@ vec4 shade() {
     if (bw > 0.0 && i_border_color.a > 0.0) {
         float inner = smoothstep(-bw - aa, -bw + aa, d);
         vec4 b = vec4(i_border_color.rgb * i_border_color.a, i_border_color.a);
-        if (i_uv.x > 0.5) b *= dash_cover(p, half_size, r, bw);
+        if (i_uv.x > 0.5) b *= dash_cover(p, half_size, r_abs, bw);
         c = mix(c, b + c * (1.0 - b.a), inner);
     }
     return c * coverage;

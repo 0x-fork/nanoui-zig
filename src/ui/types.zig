@@ -289,6 +289,8 @@ pub const TextStyle = struct {
     /// ellipsis, faded toward its end, or shortened through its middle.
     truncate: Truncate = .none,
     fade_width: f32 = 24,
+    /// Glyphs fade out toward the box's right edge.
+    fade: ?Fade = null,
     /// Wrapped text keeps at most this many lines (0: all of them), the
     /// last ending in "…" when text was dropped.
     max_lines: u8 = 0,
@@ -306,6 +308,13 @@ pub const TextStyle = struct {
 };
 
 pub const Truncate = enum { none, ellipsis, middle, fade };
+
+/// Glyphs within `clear` points of the box's right edge are transparent;
+/// they reach full opacity `ramp` points further left.
+pub const Fade = struct {
+    clear: f32,
+    ramp: f32,
+};
 
 test "rect" {
     const r: Rect = .{ .x = 10, .y = 10, .w = 100, .h = 50 };

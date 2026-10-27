@@ -269,17 +269,18 @@ fn scaleItems(items: []metal.Instance, box: types.Rect, s: f32, anchor: types.Po
 fn paintText(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, n: *const ctx_mod.Node, t: *const ctx_mod.Content.Text, clip4: [4]f32, opacity: f32, selectable: bool, moving: bool) void {
     const sel: ?Sel = if (selectable) .{ .id = n.id, .index = index, .x0 = n.rect.x, .x1 = n.rect.x + n.rect.w } else null;
     const inner = n.rect.inset(n.style.padding);
+    const inner_right = n.rect.x + n.rect.w;
     const f = c.text.font(t.style);
     const lh = c.text.lineHeight(t.style);
     if (t.style.wrap) {
         for (t.lines, 0..) |l, i| {
             const y = inner.y + lh * @as(f32, @floatFromInt(i));
-            textRun(c, out, t.*, l.start, l.end, inner.x, y, f, lh, clip4, opacity, sel, moving);
+            textRun(c, out, t.*, l.start, l.end, inner.x, y, f, lh, clip4, opacity, sel, inner_right, moving);
         }
     } else if (t.style.truncate != .none) {
-        truncated(c, out, t.*, inner, f, lh, clip4, opacity, sel, moving);
+        truncated(c, out, t.*, inner, inner_right, f, lh, clip4, opacity, sel, moving);
     } else {
-        textRun(c, out, t.*, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel, moving);
+        textRun(c, out, t.*, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel, inner_right, moving);
     }
 }
 
@@ -304,12 +305,12 @@ const Limit = struct { end: f32, fade: f32 = 0 };
 
 /// A line that may be longer than its box: whole if it fits; else cut at a
 /// glyph before an ellipsis, or drawn to the box's end, fading out.
-fn truncated(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.Text, inner: types.Rect, f: text_mod.Font, lh: f32, clip4: [4]f32, opacity: f32, sel: ?Sel, moving: bool) void {
-    const lay = c.text.layout(t.str, t.style);
-    if (lay.width <= inner.w + 0.5) return textRun(c, out, t, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel, moving);
+fn truncated(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.Text, inner: types.Rect, inner_right: f32, f: text_mod.Font, lh: f32, clip4: [4]f32, opacity: f32, sel: ?Sel, moving: bool) void {
+    const lay = t.cut_lay orelse c.text.layout(t.str, t.style);
+    if (lay.width <= inner.w + 0.5) return textRun(c, out, t, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel, inner_right, moving);
     if (t.style.truncate == .fade) {
         const limit: Limit = .{ .end = inner.x + inner.w, .fade = @min(t.style.fade_width, inner.w / 2) };
-        return textRunLimit(c, out, t, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel, limit, moving);
+        return textRunLimit(c, out, t, 0, t.str.len, inner.x, inner.y, f, lh, clip4, opacity, sel, limit, inner_right, moving);
     }
     const ellipsis = "\u{2026}";
     const room = inner.w - c.text.width(ellipsis, t.style);
@@ -325,11 +326,11 @@ fn truncated(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Conten
     while (cut > 0 and t.str[cut - 1] == ' ') cut -= 1;
     if (cut > 0) cut_x = c.text.layout(t.str[0..cut], t.style).width;
     const limit: Limit = .{ .end = inner.x + inner.w };
-    if (cut > 0) textRunLimit(c, out, t, 0, cut, inner.x, inner.y, f, lh, clip4, opacity, sel, limit, moving);
+    if (cut > 0) textRunLimit(c, out, t, 0, cut, inner.x, inner.y, f, lh, clip4, opacity, sel, limit, inner_right, moving);
     var dots = t;
     dots.str = ellipsis;
     dots.spans = &.{};
-    textRunLimit(c, out, dots, 0, ellipsis.len, inner.x + cut_x, inner.y, f, lh, clip4, opacity, null, limit, moving);
+    textRunLimit(c, out, dots, 0, ellipsis.len, inner.x + cut_x, inner.y, f, lh, clip4, opacity, null, limit, inner_right, moving);
 }
 
 /// Draws bytes [start, end) of `t`, each glyph in its span's color.
@@ -337,11 +338,11 @@ fn truncated(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Conten
 /// horizontal extent.
 const Sel = struct { id: u64, index: u32, x0: f32, x1: f32 };
 
-fn textRun(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.Text, start: usize, end: usize, x: f32, y: f32, f: text_mod.Font, lh: f32, clip4: [4]f32, opacity: f32, sel: ?Sel, moving: bool) void {
-    textRunLimit(c, out, t, start, end, x, y, f, lh, clip4, opacity, sel, null, moving);
+fn textRun(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.Text, start: usize, end: usize, x: f32, y: f32, f: text_mod.Font, lh: f32, clip4: [4]f32, opacity: f32, sel: ?Sel, inner_right: f32, moving: bool) void {
+    textRunLimit(c, out, t, start, end, x, y, f, lh, clip4, opacity, sel, null, inner_right, moving);
 }
 
-fn textRunLimit(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.Text, start: usize, end: usize, x: f32, y: f32, f: text_mod.Font, lh: f32, clip4: [4]f32, opacity: f32, sel: ?Sel, limit: ?Limit, moving: bool) void {
+fn textRunLimit(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Content.Text, start: usize, end: usize, x: f32, y: f32, f: text_mod.Font, lh: f32, clip4: [4]f32, opacity: f32, sel: ?Sel, limit: ?Limit, inner_right: f32, moving: bool) void {
     const style = t.style;
     // Cull lines wholly above or below the clip before shaping them; a
     // selectable one still counts for where the pointer is.
@@ -389,6 +390,10 @@ fn textRunLimit(c: *Context, out: *std.ArrayList(metal.Instance), t: ctx_mod.Con
                 color = metal.color4(sc.alpha(opacity));
                 tone = sc;
             };
+        }
+        if (style.fade) |fd| {
+            color[3] *= std.math.clamp((inner_right - fd.clear - (x + g.x)) / @max(fd.ramp, 0.001), 0, 1);
+            if (color[3] <= 0) continue;
         }
         // Lighter text is drawn with thicker strokes, as macOS draws it.
         const sp = c.text.glyph(g, bin, @TypeOf(c.text.*).dilationFor(tone.r, tone.g, tone.b)) orelse continue;

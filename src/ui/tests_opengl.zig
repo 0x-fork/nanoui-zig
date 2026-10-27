@@ -133,9 +133,7 @@ fn scenes(es: bool) !void {
         t.settle(1);
         // The Metal comparison's limits. Measured on an Intel Arc (Mesa):
         // a mean of 0.004 and at worst 1 level apart.
-        // Mesa's single-precision Gaussian filtering can differ from Zig's
-        // by a few intensity levels at a shadow's edge (mean below 0.07).
-        try compare(&t, .{ .mean = 0.07, .worst = 16, .off_in = 1000 }, es);
+        try compare(&t, .{ .mean = 0.05, .worst = 16, .off_in = 1000 }, es);
     }
     for ([_]ui.Theme{ .light, .dark_theme }) |theme| {
         const Scene = @import("tests_glass.zig").Scene;

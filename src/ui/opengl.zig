@@ -88,7 +88,7 @@ pub const Renderer = struct {
         g.glGenBuffers(1, &r.vbo);
         g.glBindVertexArray(r.vao);
         g.glBindBuffer(gl.ARRAY_BUFFER, r.vbo);
-        for (0..6) |k| {
+        for (0..9) |k| {
             g.glEnableVertexAttribArray(@intCast(k));
             g.glVertexAttribDivisor(@intCast(k), 1);
         }
