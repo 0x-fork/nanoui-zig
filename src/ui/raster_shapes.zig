@@ -158,16 +158,21 @@ fn blurAlongX(x: f32, y: f32, sigma: f32, corner: f32, hw: f32, hh: f32) f32 {
     return hi - lo;
 }
 
+/// Y samples of each shadow's Gaussian: 8, as the shader. Hill-climb's
+/// `--cheap-shadow` sets 1 (faster, but no longer Metal's pixels).
+pub var shadow_samples: u32 = 8;
+
 pub fn shadowAlpha(px: f32, py: f32, hw: f32, hh: f32, corner: f32, sigma: f32) f32 {
     const c = @abs(corner);
+    const n = @min(@max(shadow_samples, 1), 8);
     const low = py - hh;
     const high = py + hh;
     const start = std.math.clamp(-3 * sigma, low, high);
     const end = std.math.clamp(3 * sigma, low, high);
-    const step = (end - start) / 8;
+    const step = (end - start) / @as(f32, @floatFromInt(n));
     var y = start + step * 0.5;
     var alpha: f32 = 0;
-    for (0..8) |_| {
+    for (0..n) |_| {
         alpha += blurAlongX(px, py - y, sigma, c, hw, hh) * gaussian(y, sigma) * step;
         y += step;
     }

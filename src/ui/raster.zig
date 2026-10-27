@@ -4,7 +4,7 @@
 //! no GPU renderer, and the Tester renders with it there. A test proves it
 //! matches the Metal renderer.
 const std = @import("std");
-const shapes = @import("raster_shapes.zig");
+pub const shapes = @import("raster_shapes.zig");
 const types = @import("types.zig");
 const gpu = @import("gpu.zig");
 const glass = @import("glass.zig");
