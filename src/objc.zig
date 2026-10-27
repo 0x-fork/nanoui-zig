@@ -5,6 +5,7 @@
 //! `defineClass` registers classes at run time whose methods are Zig
 //! functions, routed back to Zig objects through one pointer ivar.
 const std = @import("std");
+const builtin = @import("builtin");
 
 /// UIKit (iOS), not AppKit: the few classes the shared Apple code names
 /// differ (`UIFont` for `NSFont`, `UIImage` for `NSImage`).
@@ -33,6 +34,8 @@ extern "c" fn objc_getProtocol(name: [*:0]const u8) ?Protocol;
 extern "c" fn sel_registerName(name: [*:0]const u8) SEL;
 extern "c" fn objc_msgSend() void;
 extern "c" fn objc_msgSendSuper() void;
+extern "c" fn objc_msgSend_stret() void;
+extern "c" fn objc_msgSendSuper_stret() void;
 extern "c" fn objc_allocateClassPair(superclass: Class, name: [*:0]const u8, extra: usize) ?Class;
 extern "c" fn objc_registerClassPair(cls: Class) void;
 extern "c" fn class_addMethod(cls: Class, name: SEL, imp: *const anyopaque, types: [*:0]const u8) BOOL;
@@ -65,7 +68,10 @@ pub fn msg(comptime R: type, target: anytype, selector: [:0]const u8, args: anyt
         break :blk p;
     };
     const F = @Fn(&params, &@splat(.{}), R, .{ .@"callconv" = .c });
-    const f: *const F = @ptrCast(&objc_msgSend);
+    const f: *const F = if (comptime needsStret(R))
+        @ptrCast(&objc_msgSend_stret)
+    else
+        @ptrCast(&objc_msgSend);
     return @call(.auto, f, .{ target, sel(selector) } ++ args);
 }
 
@@ -84,9 +90,18 @@ pub fn msgSuper(comptime R: type, target: Object, superclass: Class, selector: [
         break :blk p;
     };
     const F = @Fn(&params, &@splat(.{}), R, .{ .@"callconv" = .c });
-    const f: *const F = @ptrCast(&objc_msgSendSuper);
+    const f: *const F = if (comptime needsStret(R))
+        @ptrCast(&objc_msgSendSuper_stret)
+    else
+        @ptrCast(&objc_msgSendSuper);
     const s: Super = .{ .receiver = target, .super_class = superclass };
     return @call(.auto, f, .{ &s, sel(selector) } ++ args);
+}
+
+/// x86_64 returns structs larger than 16 bytes via a hidden pointer,
+/// which needs objc_msgSend_stret. arm64 has no stret variant.
+fn needsStret(comptime R: type) bool {
+    return builtin.cpu.arch == .x86_64 and @sizeOf(R) > 16;
 }
 
 pub fn alloc(comptime class_name: [:0]const u8) Object {
