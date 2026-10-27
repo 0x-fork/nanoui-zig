@@ -66,6 +66,6 @@ pub fn run(gpa: std.mem.Allocator, scene: scenes.Scene, frames: usize) !main.Res
         .build_ms = main.medianOf(phases[0]),
         .layout_ms = main.medianOf(phases[1]),
         .paint_ms = main.medianOf(phases[2]),
-        .renderer = if (ui.raster.shadows.samples == 4) renderer else "cpu-cheap-shadow",
+        .renderer = if (ui.raster.shapes.shadow_samples == 8) renderer else "cpu-cheap-shadow",
     };
 }

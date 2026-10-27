@@ -133,7 +133,7 @@ pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const arena = init.arena.allocator();
     const opts = try parseArgs(init);
-    if (opts.cheap_shadow) ui.raster.shadows.samples = 1;
+    if (opts.cheap_shadow) ui.raster.shapes.shadow_samples = 1;
     const want = struct {
         fn f(o: Options, fw: []const u8) bool {
             return o.only == null or std.mem.eql(u8, o.only.?, fw);

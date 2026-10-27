@@ -54,7 +54,7 @@ path when a GPU exists.
 
 `--cheap-shadow` (1 Y-sample instead of Metal's 4) cuts boxes encode
 24.0 → 13.5 ms (−44%) and dashboard 12.8 → 7.4 ms (−42%). It does
-**not** match the Metal raster tests; default stays 4.
+**not** match the Metal raster tests; default stays Metal's (4 then, 8 now).
 
 ReleaseFast binary: gallery 8.1 MB, counter 6.9 MB. Idle CPU is 0
 (nothing polls).
@@ -101,7 +101,7 @@ most scenes.
 
 ### 6. Cheap CPU shadow (flag, kept)
 
-`ui.raster.shadows.samples` defaults to 4 (Metal match).
+`ui.raster.shapes.shadow_samples` defaults to Metal's count (4 then, 8 now).
 `hillclimb --cheap-shadow` sets 1. boxes encode **24.0 → 13.5 ms**.
 A 4-sample SIMD / interior-skip try did not beat 24 ms without
 breaking raster equality, so it was not kept on the default path.

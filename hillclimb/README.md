@@ -16,7 +16,7 @@ zig build run -- --cheap-shadow --scene boxes,dashboard --only nanoui
 ```
 
 `--cheap-shadow` uses one Y-sample for CPU Gaussian shadows (faster
-encode; does not match the Metal raster tests). Default is four, as
+encode; does not match the Metal raster tests). Default is eight, as
 `shader.metal`.
 
 Each scene runs 30 frames of warm-up, then 300 measured, three times; the

@@ -39,7 +39,7 @@ pub const Drag = struct {
 /// the box (use `ui.key` first for a list's items).
 pub fn drag(c: *Context, opts: Options) Drag {
     const id = c.peekId(null);
-    const got = c.motion.get(c.gpa, id, c.frame) orelse return .{};
+    const got = c.motion_store.get(c.gpa, id, c.frame) orelse return .{};
     const s = got.state;
     const chx = &s.ch[0];
     const chy = &s.ch[1];
